@@ -1,0 +1,135 @@
+# JARVIS
+
+A multi-provider AI assistant that can **control your PC** and **delegate to other
+AI models**. JARVIS uses one model as its reasoning "brain", exposes your
+computer to it through a safe tool layer (shell, files, keyboard/mouse,
+screenshots, app launching), and can route subtasks to other models — including
+**Gemini** and **ChatGPT** in a real browser, and the free-tier APIs of **Kimi,
+GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
+
+> **Target OS:** Windows (PC-control layer is Windows-first; shell/file/API
+> layers are cross-platform). It runs on macOS/Linux too, minus some Windows
+> app shortcuts.
+
+---
+
+## What it can do
+
+- **Reason and act in a loop** — JARVIS plans, calls tools, observes results,
+  and repeats until your request is done (OpenAI-style function calling).
+- **Control the PC** — run commands, read/write files, move the mouse, type,
+  press hotkeys, take screenshots, manage the clipboard, launch & focus apps.
+- **Use other AIs as tools** — `ask_model` routes a subtask to any configured
+  backend: API models, or Gemini/ChatGPT driven in a browser.
+- **Stay safe** — every dangerous action (shell, writes, clicks, keystrokes,
+  launches) passes through a confirmation gate with a hard blocklist.
+
+---
+
+## Architecture
+
+```
+jarvis/
+  providers/        OpenAI-compatible client + per-provider registry
+                    (kimi, glm, groq, cerebras, mistral, nvidia)
+  tools/            the things JARVIS can DO
+                    filesystem · shell · system_info · pc_control · apps
+                    · ai_delegate (ask_model)
+  integrations/
+    web/            Gemini & ChatGPT via Playwright (persistent login)
+    desktop/        Claude desktop & Cursor via window focus + keyboard
+  core/             agent loop · memory · config · prompts
+  utils/            logging · safety gate
+  app.py            wires config + providers + tools into an Agent
+  cli.py            interactive REPL / one-shot mode
+```
+
+All six API providers speak the same OpenAI `/chat/completions` dialect, so they
+share **one** client (`OpenAICompatibleProvider`) parameterised by base URL,
+key, and model. Add another OpenAI-compatible provider by adding one entry to
+`PROVIDER_SPECS` in `jarvis/providers/registry.py`.
+
+---
+
+## Setup
+
+```bash
+# 1. Install
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -e ".[all]"                            # core + pc + web extras
+playwright install chromium                        # for Gemini/ChatGPT web
+
+# 2. Configure keys
+cp .env.example .env        # then edit .env and fill in the keys you have
+```
+
+You only need a key for **at least one** provider. Get free keys from:
+
+| Provider | Where | Free model (default) |
+|----------|-------|----------------------|
+| Groq     | console.groq.com        | `llama-3.3-70b-versatile` |
+| GLM      | open.bigmodel.cn        | `glm-4-flash` |
+| Cerebras | cloud.cerebras.ai       | `llama-3.3-70b` |
+| Mistral  | console.mistral.ai      | `mistral-small-latest` |
+| Kimi     | platform.moonshot.ai    | `moonshot-v1-8k` |
+| NVIDIA   | build.nvidia.com        | `nvidia/llama-3.1-nemotron-ultra-253b-v1` |
+
+Set `JARVIS_DEFAULT_PROVIDER` in `.env` to pick the reasoning brain.
+
+---
+
+## Usage
+
+```bash
+# Interactive
+python -m jarvis
+
+# One-shot
+python -m jarvis "take a screenshot and tell me what's on screen"
+python -m jarvis "ask gemini for 3 dinner ideas, then save them to notes.txt"
+
+# Skip browser backends (no Gemini/ChatGPT, faster startup)
+python -m jarvis --no-web
+```
+
+Inside the loop, JARVIS decides which tools to call. Examples:
+
+- *"open Cursor and create a new Python file"* → `open_app` + PC control
+- *"what's eating my CPU?"* → `list_processes`
+- *"ask chatgpt to explain X, then summarize it for me"* → `ask_model` (web)
+- *"clean up *.tmp in Downloads"* → `run_command` (asks you to confirm first)
+
+---
+
+## Safety
+
+Dangerous tools are gated. With `JARVIS_REQUIRE_CONFIRMATION=true` (default)
+JARVIS asks before each shell command, file write/delete, click, keystroke, or
+app launch. A **hard blocklist** (`rm -rf /`, fork bombs, `mkfs`, `format c:`,
+…) is always refused. Set the env var to `false` only for tasks you fully trust.
+
+---
+
+## Honest limitations
+
+- **Web automation is brittle.** Gemini/ChatGPT have no public free chat API, so
+  JARVIS drives them in a browser. Their HTML changes often — the selectors in
+  `integrations/web/*.py` may need occasional updates. You log in once in the
+  launched browser window (a persistent profile keeps you signed in).
+- **Desktop Claude/Cursor have no text-out.** `integrations/desktop` can launch,
+  focus, and type into them, but it can't reliably read their replies back as
+  text. Prefer the API/web backends when you need the answer programmatically.
+- **PC control needs a real desktop session.** `pyautogui`/`pygetwindow` won't
+  work over a headless/SSH session without a display.
+
+---
+
+## Development
+
+```bash
+pip install -e ".[all]" pytest
+pytest -q          # headless smoke tests (no keys/desktop needed)
+```
+
+The package is import-safe without the optional GUI/browser deps, so the core
+and provider layers can be tested and used on a server.

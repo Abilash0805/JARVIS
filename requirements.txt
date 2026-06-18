@@ -1,0 +1,22 @@
+# --- Core (required) ---
+httpx>=0.27          # HTTP client for all OpenAI-compatible providers
+pydantic>=2.6        # config + structured data
+python-dotenv>=1.0   # load API keys from .env
+PyYAML>=6.0          # config files
+rich>=13.7           # pretty CLI output
+prompt_toolkit>=3.0  # interactive REPL
+
+# --- PC control (Windows desktop automation) ---
+# Install on the machine that will run JARVIS.
+pyautogui>=0.9.54    # keyboard / mouse / screenshot
+pygetwindow>=0.0.9   # window focus & enumeration
+psutil>=5.9          # process & system info
+pyperclip>=1.8       # clipboard
+# pywin32>=306       # Windows-only; uncomment on Windows for richer control
+
+# --- Web automation (Gemini / ChatGPT in the browser) ---
+playwright>=1.42     # run `playwright install chromium` after install
+
+# --- Voice (optional, off by default) ---
+# SpeechRecognition>=3.10
+# pyttsx3>=2.90

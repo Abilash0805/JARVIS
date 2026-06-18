@@ -1,0 +1,43 @@
+"""Configuration: load .env + a couple of top-level settings."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass
+class Config:
+    default_provider: str = "groq"
+    require_confirmation: bool = True
+    include_pc_control: bool = True
+    max_iterations: int = 12
+    temperature: float = 0.7
+
+
+def load_config(env_path: str | os.PathLike[str] | None = None) -> Config:
+    """Load environment from a .env file (if present) and build a Config."""
+    try:
+        from dotenv import load_dotenv
+
+        if env_path is not None:
+            load_dotenv(env_path)
+        else:
+            # Look for .env in CWD then the repo root.
+            for candidate in (Path.cwd() / ".env", Path(__file__).resolve().parents[2] / ".env"):
+                if candidate.is_file():
+                    load_dotenv(candidate)
+                    break
+    except ImportError:
+        pass  # python-dotenv optional; rely on real environment
+
+    return Config(
+        default_provider=os.getenv("JARVIS_DEFAULT_PROVIDER", "groq").lower(),
+        require_confirmation=os.getenv("JARVIS_REQUIRE_CONFIRMATION", "true").lower()
+        != "false",
+        include_pc_control=os.getenv("JARVIS_INCLUDE_PC_CONTROL", "true").lower()
+        != "false",
+        max_iterations=int(os.getenv("JARVIS_MAX_ITERATIONS", "12")),
+        temperature=float(os.getenv("JARVIS_TEMPERATURE", "0.7")),
+    )
