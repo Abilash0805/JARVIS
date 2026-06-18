@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from jarvis.core.agent import Agent
 from jarvis.core.config import Config, load_config
 from jarvis.core.longterm import LongTermMemory
+from jarvis.core.memory import Memory
+from jarvis.core.prompts import build_system_prompt
+from jarvis.scheduler import TaskScheduler
 from jarvis.providers.base import LLMProvider, ProviderError
 from jarvis.providers.registry import build_registry, build_vision_provider
 from jarvis.providers.router import RoutingProvider
@@ -27,6 +31,7 @@ class JarvisRuntime:
     web_backends: dict[str, object]
     brain_name: str
     vision_enabled: bool = False
+    scheduler: Optional[TaskScheduler] = None
 
 
 def build_runtime(enable_web: bool = True) -> JarvisRuntime:
@@ -75,6 +80,25 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
         max_iterations=config.max_iterations,
         temperature=config.temperature,
     )
+
+    # Scheduler: scheduled tasks run in a fresh agent (same brain + tools, new
+    # memory) so they don't interfere with the live conversation.
+    scheduler = TaskScheduler()
+
+    def scheduled_runner(prompt: str) -> str:
+        worker = Agent(
+            provider=brain,
+            toolset=toolset,
+            memory=Memory(build_system_prompt()),
+            max_iterations=config.max_iterations,
+            temperature=config.temperature,
+        )
+        return worker.run(prompt)
+
+    from jarvis.tools.scheduler_tools import make_scheduler_tools
+
+    toolset.extend(make_scheduler_tools(scheduler, scheduled_runner))
+
     return JarvisRuntime(
         agent=agent,
         config=config,
@@ -82,4 +106,5 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
         web_backends=web_backends,
         brain_name=brain_name,
         vision_enabled=vision_provider is not None,
+        scheduler=scheduler,
     )

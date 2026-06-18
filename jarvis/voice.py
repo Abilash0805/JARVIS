@@ -76,3 +76,35 @@ class Voice:
             return ""
         except sr.RequestError as exc:
             raise RuntimeError(f"speech recognition failed: {exc}")
+
+    def run_wake_loop(
+        self,
+        on_command,
+        wake_word: str = "jarvis",
+        should_stop=None,
+    ) -> None:
+        """Listen continuously; on hearing the wake word, capture a command.
+
+        If the wake-word utterance also contains the command ("jarvis, what
+        time is it"), that text is used directly; otherwise JARVIS prompts for
+        the command. ``on_command(text)`` handles each captured command;
+        ``should_stop()`` (optional) ends the loop when it returns True.
+        """
+        if not self.stt_available:
+            raise RuntimeError("speech recognition not available")
+        wake = wake_word.lower()
+        while not (should_stop and should_stop()):
+            try:
+                heard = self.listen(timeout=None, phrase_limit=6.0).lower()
+            except RuntimeError:
+                continue
+            if wake not in heard:
+                continue
+            remainder = heard.split(wake, 1)[1].strip(" ,.").strip()
+            if remainder:
+                command = remainder
+            else:
+                self.speak("Yes?")
+                command = self.listen(timeout=8.0, phrase_limit=15.0)
+            if command.strip():
+                on_command(command.strip())

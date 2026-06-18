@@ -50,15 +50,25 @@ def main(argv: list[str] | None = None) -> int:
     def say(msg: str) -> None:
         console.print(msg) if console else print(msg)
 
+    # Web dashboard mode builds its own runtime and blocks serving.
+    if "--dashboard" in argv:
+        from jarvis.dashboard import serve
+
+        serve(enable_web="--no-web" not in argv)
+        return 0
+
     try:
         runtime = build_runtime(enable_web="--no-web" not in argv)
     except ProviderError as exc:
         say(f"[startup error] {exc}")
         return 1
+    if runtime.scheduler:
+        runtime.scheduler.start()
 
     # Optional voice mode (offline / free).
     voice = None
-    if "--voice" in argv:
+    wake_mode = "--wake" in argv
+    if "--voice" in argv or wake_mode:
         from jarvis.voice import Voice
 
         voice = Voice()
@@ -78,6 +88,26 @@ def main(argv: list[str] | None = None) -> int:
     if oneshot:
         answer = runtime.agent.run(" ".join(oneshot), on_event=emit)
         say(f"\nJARVIS: {answer}")
+        return 0
+
+    # Hands-free wake-word mode: say "JARVIS, ..." to issue commands.
+    if wake_mode:
+        if not voice or not voice.stt_available:
+            say("[wake mode needs a microphone + SpeechRecognition]")
+            return 1
+        say('Wake mode active. Say "JARVIS, ..." (Ctrl-C to quit).')
+
+        def handle(command: str) -> None:
+            say(f"you> {command}")
+            answer = runtime.agent.run(command, on_event=emit)
+            say(f"\nJARVIS: {answer}\n")
+            if voice.tts_available:
+                voice.speak(answer)
+
+        try:
+            voice.run_wake_loop(handle)
+        except KeyboardInterrupt:
+            say("\nbye.")
         return 0
 
     while True:

@@ -29,7 +29,12 @@ GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
   free vision model, so JARVIS can act on what's actually there.
 - **Remember across sessions** — `remember`/`recall` persist facts and
   preferences in a local SQLite store (free, offline).
-- **Talk** — optional offline voice in/out (`--voice`), no cloud key needed.
+- **Talk, hands-free** — optional offline voice in/out (`--voice`), plus a
+  wake-word loop (`--wake`): just say *"JARVIS, …"*. No cloud key needed.
+- **Schedule work** — `schedule_task` runs prompts later or on a repeat
+  (*"every 30 minutes"*, *"at 14:30"*); results are logged.
+- **Web dashboard** — `--dashboard` serves a local page to drive JARVIS and
+  watch its tool calls live (stdlib only, no web framework).
 - **Use other AIs as tools** — `ask_model` routes a subtask to any configured
   backend: API models, or Gemini/ChatGPT driven in a browser.
 - **Stay safe** — every dangerous action (shell, writes, clicks, keystrokes,
@@ -47,12 +52,14 @@ jarvis/
   tools/            the things JARVIS can DO
                     filesystem · shell · system_info · pc_control · apps
                     · ai_delegate (ask_model) · vision (see_screen)
-                    · memory_tools (remember/recall)
+                    · memory_tools (remember/recall) · scheduler_tools
   integrations/
     web/            Gemini & ChatGPT via Playwright (persistent login)
     desktop/        Claude desktop & Cursor via window focus + keyboard
   core/             agent loop · memory · longterm (SQLite) · config · prompts
-  voice.py          optional offline TTS/STT
+  scheduler.py      run tasks later / on a repeat (stdlib threads)
+  dashboard.py      local web UI to drive & watch JARVIS (stdlib http.server)
+  voice.py          optional offline TTS/STT + wake-word loop
   utils/            logging · safety gate
   app.py            wires config + providers + tools into an Agent
   cli.py            interactive REPL / one-shot mode
@@ -108,7 +115,17 @@ python -m jarvis --no-web
 # Voice mode (offline TTS/STT — needs the `voice` extra + a microphone)
 pip install -e ".[voice]"      # for fully offline STT also: pip install pocketsphinx
 python -m jarvis --voice
+
+# Hands-free wake word — say "JARVIS, ..." to issue commands
+python -m jarvis --wake
+
+# Local web dashboard — open http://127.0.0.1:8765 to drive & watch JARVIS
+python -m jarvis --dashboard
 ```
+
+Scheduling works through normal conversation, e.g. *"every morning at 09:00,
+summarize my unread emails"* → JARVIS calls `schedule_task`; results land in
+`~/.jarvis/scheduled.log`.
 
 Inside the loop, JARVIS decides which tools to call. Examples:
 
