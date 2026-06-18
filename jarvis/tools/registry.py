@@ -13,7 +13,9 @@ from jarvis.tools.system_info import make_system_info_tools
 from jarvis.utils.safety import SafetyGate
 
 if TYPE_CHECKING:
+    from jarvis.core.longterm import LongTermMemory
     from jarvis.providers.base import LLMProvider
+    from jarvis.providers.openai_compatible import OpenAICompatibleProvider
 
 
 def default_toolset(
@@ -21,6 +23,8 @@ def default_toolset(
     *,
     api_providers: Optional[dict[str, "LLMProvider"]] = None,
     web_backends: Optional[dict[str, object]] = None,
+    vision_provider: Optional["OpenAICompatibleProvider"] = None,
+    longterm: Optional["LongTermMemory"] = None,
     include_pc_control: bool = True,
 ) -> Toolset:
     """Build the standard toolset.
@@ -47,4 +51,12 @@ def default_toolset(
         from jarvis.tools.ai_delegate import make_ai_delegate_tools
 
         ts.extend(make_ai_delegate_tools(api_providers or {}, web_backends or {}))
+    if vision_provider is not None:
+        from jarvis.tools.vision import make_vision_tools
+
+        ts.extend(make_vision_tools(vision_provider))
+    if longterm is not None:
+        from jarvis.tools.memory_tools import make_memory_tools
+
+        ts.extend(make_memory_tools(longterm))
     return ts

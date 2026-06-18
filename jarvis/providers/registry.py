@@ -53,6 +53,38 @@ PROVIDER_SPECS: dict[str, ProviderSpec] = {
 }
 
 
+# Free vision-capable models, keyed by the provider whose credentials they use.
+VISION_MODELS: dict[str, str] = {
+    "groq": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "nvidia": "meta/llama-3.2-90b-vision-instruct",
+}
+
+
+def build_vision_provider() -> Optional[OpenAICompatibleProvider]:
+    """Build a provider configured for image description, if keys allow.
+
+    Controlled by ``JARVIS_VISION_PROVIDER`` (default: groq) and
+    ``JARVIS_VISION_MODEL`` (override the model). Reuses the chosen provider's
+    base URL and API key.
+    """
+    name = os.getenv("JARVIS_VISION_PROVIDER", "groq").lower()
+    spec = PROVIDER_SPECS.get(name)
+    if spec is None:
+        return None
+    api_key = os.getenv(spec.key_env, "").strip()
+    if not api_key:
+        return None
+    model = os.getenv("JARVIS_VISION_MODEL") or VISION_MODELS.get(name)
+    if not model:
+        return None
+    return OpenAICompatibleProvider(
+        name=f"{name}-vision",
+        api_key=api_key,
+        base_url=os.getenv(spec.base_env, spec.default_base),
+        model=model,
+    )
+
+
 def build_provider(name: str) -> Optional[LLMProvider]:
     """Construct one provider by name, or ``None`` if its key is unset."""
     spec = PROVIDER_SPECS.get(name)

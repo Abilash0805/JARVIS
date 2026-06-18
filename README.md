@@ -13,12 +13,23 @@ GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
 
 ---
 
+> **100% free.** Every backend is a free-tier API or a free/offline local
+> library. No paid services are required anywhere.
+
 ## What it can do
 
 - **Reason and act in a loop** — JARVIS plans, calls tools, observes results,
   and repeats until your request is done (OpenAI-style function calling).
+- **Never get stuck on a rate limit** — all configured providers form a
+  fallback chain; when one free tier throttles, JARVIS transparently switches
+  to the next.
 - **Control the PC** — run commands, read/write files, move the mouse, type,
   press hotkeys, take screenshots, manage the clipboard, launch & focus apps.
+- **See the screen** — `see_screen` screenshots and describes the UI with a
+  free vision model, so JARVIS can act on what's actually there.
+- **Remember across sessions** — `remember`/`recall` persist facts and
+  preferences in a local SQLite store (free, offline).
+- **Talk** — optional offline voice in/out (`--voice`), no cloud key needed.
 - **Use other AIs as tools** — `ask_model` routes a subtask to any configured
   backend: API models, or Gemini/ChatGPT driven in a browser.
 - **Stay safe** — every dangerous action (shell, writes, clicks, keystrokes,
@@ -32,13 +43,16 @@ GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
 jarvis/
   providers/        OpenAI-compatible client + per-provider registry
                     (kimi, glm, groq, cerebras, mistral, nvidia)
+    providers/router.py  fallback chain across all free providers
   tools/            the things JARVIS can DO
                     filesystem · shell · system_info · pc_control · apps
-                    · ai_delegate (ask_model)
+                    · ai_delegate (ask_model) · vision (see_screen)
+                    · memory_tools (remember/recall)
   integrations/
     web/            Gemini & ChatGPT via Playwright (persistent login)
     desktop/        Claude desktop & Cursor via window focus + keyboard
-  core/             agent loop · memory · config · prompts
+  core/             agent loop · memory · longterm (SQLite) · config · prompts
+  voice.py          optional offline TTS/STT
   utils/            logging · safety gate
   app.py            wires config + providers + tools into an Agent
   cli.py            interactive REPL / one-shot mode
@@ -90,6 +104,10 @@ python -m jarvis "ask gemini for 3 dinner ideas, then save them to notes.txt"
 
 # Skip browser backends (no Gemini/ChatGPT, faster startup)
 python -m jarvis --no-web
+
+# Voice mode (offline TTS/STT — needs the `voice` extra + a microphone)
+pip install -e ".[voice]"      # for fully offline STT also: pip install pocketsphinx
+python -m jarvis --voice
 ```
 
 Inside the loop, JARVIS decides which tools to call. Examples:

@@ -6,8 +6,10 @@ from dataclasses import dataclass
 
 from jarvis.core.agent import Agent
 from jarvis.core.config import Config, load_config
+from jarvis.core.longterm import LongTermMemory
 from jarvis.providers.base import LLMProvider, ProviderError
-from jarvis.providers.registry import build_registry
+from jarvis.providers.registry import build_registry, build_vision_provider
+from jarvis.providers.router import RoutingProvider
 from jarvis.tools.registry import default_toolset
 from jarvis.utils.logging import get_logger
 from jarvis.utils.safety import SafetyGate
@@ -24,6 +26,7 @@ class JarvisRuntime:
     api_providers: dict[str, LLMProvider]
     web_backends: dict[str, object]
     brain_name: str
+    vision_enabled: bool = False
 
 
 def build_runtime(enable_web: bool = True) -> JarvisRuntime:
@@ -35,7 +38,8 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
             "least one provider key (e.g. GROQ_API_KEY)."
         )
 
-    # Pick the reasoning brain.
+    # Pick the preferred brain, then chain all providers behind it so free-tier
+    # rate limits fall through to a working backend automatically.
     brain_name = config.default_provider
     if brain_name not in api_providers:
         brain_name = next(iter(api_providers))
@@ -43,7 +47,7 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
             "default provider %r not configured; using %r",
             config.default_provider, brain_name,
         )
-    brain = api_providers[brain_name]
+    brain = RoutingProvider(list(api_providers.values()), primary=brain_name)
 
     # Optional browser AIs (Gemini/ChatGPT).
     web_backends: dict[str, object] = {}
@@ -52,11 +56,16 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
 
         web_backends = build_web_backends()
 
+    vision_provider = build_vision_provider()
+    longterm = LongTermMemory()
+
     gate = SafetyGate(require_confirmation=config.require_confirmation)
     toolset = default_toolset(
         gate,
         api_providers=api_providers,
         web_backends=web_backends,
+        vision_provider=vision_provider,
+        longterm=longterm,
         include_pc_control=config.include_pc_control,
     )
 
@@ -72,4 +81,5 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
         api_providers=api_providers,
         web_backends=web_backends,
         brain_name=brain_name,
+        vision_enabled=vision_provider is not None,
     )

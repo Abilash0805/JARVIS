@@ -7,6 +7,9 @@ implementation parameterised by base URL + key + model covers all of them.
 
 from __future__ import annotations
 
+import base64
+import mimetypes
+from pathlib import Path
 from typing import Any, Optional
 
 import httpx
@@ -88,6 +91,49 @@ class OpenAICompatibleProvider(LLMProvider):
             raise ProviderError(f"{self.name}: invalid JSON response") from exc
 
         return self._parse(data)
+
+    def describe_image(
+        self,
+        image_path: str,
+        prompt: str,
+        *,
+        model: Optional[str] = None,
+        max_tokens: int = 1024,
+    ) -> str:
+        """Send an image + prompt to a vision model and return its description.
+
+        Uses the OpenAI multimodal message shape (a content array with an
+        ``image_url`` carrying a base64 data URL), which the free vision models
+        on Groq and NVIDIA NIM accept.
+        """
+        path = Path(image_path).expanduser()
+        if not path.is_file():
+            raise ProviderError(f"image not found: {path}")
+        mime = mimetypes.guess_type(path.name)[0] or "image/png"
+        b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+        payload = {
+            "model": model or self.model,
+            "max_tokens": max_tokens,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url",
+                         "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                    ],
+                }
+            ],
+        }
+        url = f"{self._base_url}/chat/completions"
+        try:
+            with httpx.Client(timeout=self._timeout) as client:
+                resp = client.post(url, headers=self._headers, json=payload)
+        except httpx.HTTPError as exc:
+            raise ProviderError(f"{self.name}: vision request failed: {exc}") from exc
+        if resp.status_code >= 400:
+            raise ProviderError(f"{self.name}: HTTP {resp.status_code}: {resp.text[:500]}")
+        return self._parse(resp.json()).content or "<no description>"
 
     @staticmethod
     def _parse(data: dict[str, Any]) -> ProviderResponse:

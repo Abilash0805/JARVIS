@@ -56,12 +56,21 @@ def main(argv: list[str] | None = None) -> int:
         say(f"[startup error] {exc}")
         return 1
 
+    # Optional voice mode (offline / free).
+    voice = None
+    if "--voice" in argv:
+        from jarvis.voice import Voice
+
+        voice = Voice()
+        say(f"voice: tts={voice.tts_available} stt={voice.stt_available}")
+
     say(_BANNER)
-    say(f"brain: {runtime.brain_name}  |  api models: {', '.join(runtime.api_providers)}")
+    say(f"brain: {runtime.brain_name} (+fallback)  |  api models: {', '.join(runtime.api_providers)}")
     if runtime.web_backends:
         say(f"web backends: {', '.join(runtime.web_backends)}")
-    say("tools: %d  |  confirmation: %s" % (
-        len(runtime.agent.toolset), runtime.config.require_confirmation))
+    say("tools: %d  |  vision: %s  |  confirmation: %s" % (
+        len(runtime.agent.toolset), runtime.vision_enabled,
+        runtime.config.require_confirmation))
     say("Type your request, or 'exit' to quit.\n")
 
     # One-shot mode: `python -m jarvis "do something"`
@@ -73,10 +82,18 @@ def main(argv: list[str] | None = None) -> int:
 
     while True:
         try:
-            user = input("you> ").strip()
+            if voice and voice.stt_available:
+                say("[listening — speak now]")
+                user = voice.listen().strip()
+                say(f"you> {user}")
+            else:
+                user = input("you> ").strip()
         except (EOFError, KeyboardInterrupt):
             say("\nbye.")
             return 0
+        except RuntimeError as exc:
+            say(f"[voice error] {exc}")
+            continue
         if not user:
             continue
         if user.lower() in {"exit", "quit", ":q"}:
@@ -84,6 +101,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         answer = runtime.agent.run(user, on_event=emit)
         say(f"\nJARVIS: {answer}\n")
+        if voice and voice.tts_available:
+            voice.speak(answer)
 
 
 if __name__ == "__main__":
