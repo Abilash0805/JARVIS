@@ -39,7 +39,7 @@ PROVIDER_SPECS: dict[str, ProviderSpec] = {
     ),
     "cerebras": ProviderSpec(
         "cerebras", "CEREBRAS_API_KEY", "CEREBRAS_BASE_URL", "CEREBRAS_MODEL",
-        "https://api.cerebras.ai/v1", "llama-3.3-70b",
+        "https://api.cerebras.ai/v1", "gpt-oss-120b",
     ),
     "mistral": ProviderSpec(
         "mistral", "MISTRAL_API_KEY", "MISTRAL_BASE_URL", "MISTRAL_MODEL",

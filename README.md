@@ -136,7 +136,7 @@ You only need a key for **at least one** provider. Get free keys from:
 |----------|-------|----------------------|
 | Groq     | console.groq.com        | `llama-3.3-70b-versatile` |
 | GLM      | open.bigmodel.cn        | `glm-4-flash` |
-| Cerebras | cloud.cerebras.ai       | `llama-3.3-70b` |
+| Cerebras | cloud.cerebras.ai       | `gpt-oss-120b` |
 | Mistral  | console.mistral.ai      | `mistral-small-latest` |
 | Kimi     | platform.moonshot.ai    | `moonshot-v1-8k` |
 | NVIDIA   | build.nvidia.com        | `nvidia/llama-3.1-nemotron-ultra-253b-v1` |
