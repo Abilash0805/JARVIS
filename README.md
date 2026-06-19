@@ -110,6 +110,16 @@ skipped, but a tool-less spec (the planner) is kept as a pure-reasoning agent.
 
 ## Setup
 
+### Windows (turnkey)
+
+```bat
+setup.bat        :: one-time: venv + install + browser + seeds .env
+:: then edit .env, paste in a free API key (Groq is easiest), and:
+run.bat          :: interactive   (run.bat --wake / --voice / --dashboard)
+```
+
+### Manual (any OS)
+
 ```bash
 # 1. Install
 python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
