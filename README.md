@@ -148,8 +148,9 @@ python -m jarvis "ask gemini for 3 dinner ideas, then save them to notes.txt"
 # Skip browser backends (no Gemini/ChatGPT, faster startup)
 python -m jarvis --no-web
 
-# Voice mode (offline TTS/STT — needs the `voice` extra + a microphone)
+# Voice mode (free TTS/STT — needs the `voice` extra + a microphone)
 pip install -e ".[voice]"      # for fully offline STT also: pip install pocketsphinx
+python -m jarvis.voice "test"  # verify talkback first (speaks two sentences)
 python -m jarvis --voice
 
 # Hands-free wake word — say "JARVIS, ..." to issue commands

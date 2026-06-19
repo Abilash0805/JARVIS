@@ -1,6 +1,9 @@
 """Optional voice I/O — completely free / offline-capable.
 
-- TTS: ``pyttsx3`` uses the OS speech engine (SAPI5 on Windows). No cloud, no key.
+- TTS: on Windows we drive the built-in **System.Speech** synthesizer via
+  PowerShell, which reliably speaks on every call. ``pyttsx3`` is used as a
+  fallback / on other OSes. (Reusing a single pyttsx3 engine is what causes the
+  common "speaks only once" bug, so we avoid it.)
 - STT: ``SpeechRecognition``. Use the offline Sphinx engine for a fully free
   pipeline, or Google's free web endpoint (no key) if you prefer accuracy.
 
@@ -8,6 +11,10 @@ Everything is guarded so importing JARVIS never requires these packages.
 """
 
 from __future__ import annotations
+
+import platform
+import shutil
+import subprocess
 
 from jarvis.utils.logging import get_logger
 
@@ -17,28 +24,43 @@ logger = get_logger("jarvis.voice")
 class Voice:
     def __init__(self, stt_engine: str = "google", rate: int = 185) -> None:
         self.stt_engine = stt_engine
-        self._tts = None
+        self.rate = rate
         self._recognizer = None
         self._mic = None
-        self._init_tts(rate)
+        self._tts_backend = self._detect_tts()
         self._init_stt()
+        if self._tts_backend:
+            logger.info("TTS backend: %s", self._tts_backend)
 
     @property
     def tts_available(self) -> bool:
-        return self._tts is not None
+        return self._tts_backend is not None
+
+    @property
+    def tts_backend(self) -> str | None:
+        return self._tts_backend
 
     @property
     def stt_available(self) -> bool:
         return self._recognizer is not None and self._mic is not None
 
-    def _init_tts(self, rate: int) -> None:
+    # --- TTS backend detection -------------------------------------------
+    def _detect_tts(self) -> str | None:
+        # Windows: prefer System.Speech via PowerShell — rock solid for repeated
+        # calls, no extra install.
+        if platform.system() == "Windows" and (
+            shutil.which("powershell") or shutil.which("powershell.exe")
+        ):
+            return "sapi"
+        # Otherwise try pyttsx3 (espeak/nsss/sapi5 wrapper).
         try:
-            import pyttsx3
+            import pyttsx3  # noqa: F401
 
-            self._tts = pyttsx3.init()
-            self._tts.setProperty("rate", rate)
+            return "pyttsx3"
         except Exception as exc:  # noqa: BLE001
-            logger.info("TTS unavailable (pip install pyttsx3): %s", exc)
+            logger.info("pyttsx3 unavailable (pip install pyttsx3): %s", exc)
+        # Last resort: pyttsx3 on Windows even without powershell.
+        return None
 
     def _init_stt(self) -> None:
         try:
@@ -51,11 +73,52 @@ class Voice:
                 "STT unavailable (pip install SpeechRecognition pyaudio): %s", exc
             )
 
+    # --- TTS ------------------------------------------------------------
     def speak(self, text: str) -> None:
-        if not self._tts:
+        text = (text or "").strip()
+        if not text or not self._tts_backend:
             return
-        self._tts.say(text)
-        self._tts.runAndWait()
+        if self._tts_backend == "sapi":
+            try:
+                self._speak_sapi(text)
+                return
+            except Exception as exc:  # noqa: BLE001 - fall back to pyttsx3
+                logger.warning("SAPI speak failed (%s); trying pyttsx3", exc)
+        try:
+            self._speak_pyttsx3(text)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("TTS failed: %s", exc)
+
+    def _speak_sapi(self, text: str) -> None:
+        # Map our ~words-per-minute rate (≈185 default) to SAPI's -10..10 scale.
+        sapi_rate = max(-10, min(10, round((self.rate - 185) / 15)))
+        safe = text.replace("'", "''")
+        script = (
+            "Add-Type -AssemblyName System.Speech; "
+            "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+            f"$s.Rate = {sapi_rate}; $s.Speak('{safe}')"
+        )
+        exe = shutil.which("powershell") or "powershell.exe"
+        subprocess.run(
+            [exe, "-NoProfile", "-NonInteractive", "-Command", script],
+            check=True,
+            capture_output=True,
+            timeout=120,
+        )
+
+    def _speak_pyttsx3(self, text: str) -> None:
+        import pyttsx3
+
+        # Fresh engine per utterance avoids the "speaks once then stops" bug
+        # caused by reusing a cached engine across runAndWait() calls.
+        engine = pyttsx3.init()
+        engine.setProperty("rate", self.rate)
+        engine.say(text)
+        engine.runAndWait()
+        try:
+            engine.stop()
+        except Exception:  # noqa: BLE001
+            pass
 
     def listen(self, timeout: float = 8.0, phrase_limit: float = 15.0) -> str:
         """Capture one utterance from the mic and return the transcript."""
@@ -108,3 +171,29 @@ class Voice:
                 command = self.listen(timeout=8.0, phrase_limit=15.0)
             if command.strip():
                 on_command(command.strip())
+
+
+def _selftest(argv: list[str]) -> int:
+    """`python -m jarvis.voice ["text to speak"]` — verify TTS/STT quickly."""
+    v = Voice()
+    print(f"TTS backend: {v.tts_backend}  (available={v.tts_available})")
+    print(f"STT available: {v.stt_available}")
+    text = " ".join(a for a in argv if not a.startswith("-")) or (
+        "Hello, this is JARVIS. Voice output is working."
+    )
+    if v.tts_available:
+        print(f"speaking: {text!r}")
+        v.speak(text)
+        v.speak("And this is a second sentence, to prove repeated speech works.")
+        print("done — if you heard two sentences, talkback is fixed.")
+    else:
+        print("No TTS backend. On Windows ensure PowerShell is on PATH, "
+              "or `pip install pyttsx3`.")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    raise SystemExit(_selftest(sys.argv[1:]))
