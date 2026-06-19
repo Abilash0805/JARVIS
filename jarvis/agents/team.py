@@ -47,7 +47,9 @@ def build_team(
     team: dict[str, Agent] = {}
     for spec in specs:
         sub_tools = toolset.subset(spec.tools)
-        if len(sub_tools) == 0:
+        # Skip only if the agent *wanted* tools but none are available; a spec
+        # with no tools (e.g. the planner) is a valid pure-reasoning agent.
+        if spec.tools and len(sub_tools) == 0:
             logger.info("skipping agent %r — none of its tools are available", spec.name)
             continue
         provider = _provider_for(spec, api_providers, fallback_brain)

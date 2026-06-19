@@ -28,6 +28,21 @@ class AgentSpec:
 
 DEFAULT_SPECS: list[AgentSpec] = [
     AgentSpec(
+        name="planner",
+        description="Turns a complex goal into a concrete, numbered, step-by-step plan.",
+        provider="kimi",
+        tools=[],  # pure reasoning, intentionally no tools
+        system_prompt=(
+            "You are the Planner agent. Given a goal, produce a concise, "
+            "numbered, step-by-step plan to achieve it. For each step, name the "
+            "specialist that should do it — coder (code/files/shell), operator "
+            "(GUI control), researcher (gather info), analyst (diagnose) — and "
+            "the concrete action. Do NOT execute anything; only plan. Keep the "
+            "plan minimal, ordered, and directly actionable. If the goal is "
+            "trivial, say so and give a one-line plan."
+        ),
+    ),
+    AgentSpec(
         name="coder",
         description="Writes, edits and runs code and scripts; file and shell work.",
         provider="nvidia",

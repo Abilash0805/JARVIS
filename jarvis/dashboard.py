@@ -53,15 +53,21 @@ class DashboardState:
             self.busy = True
         self.buffer.append({"kind": "user", "text": prompt})
 
+        def emit(e) -> None:
+            self.buffer.append(_event_dict(e))
+
         def worker() -> None:
+            # Route nested specialist progress to the same feed.
+            if self.runtime.sink:
+                self.runtime.sink.callback = emit
             try:
-                answer = self.runtime.agent.run(
-                    prompt, on_event=lambda e: self.buffer.append(_event_dict(e))
-                )
+                answer = self.runtime.agent.run(prompt, on_event=emit)
                 self.buffer.append({"kind": "answer", "text": answer})
             except Exception as exc:  # noqa: BLE001
                 self.buffer.append({"kind": "error", "text": str(exc)})
             finally:
+                if self.runtime.sink:
+                    self.runtime.sink.callback = None
                 with self._lock:
                     self.busy = False
 

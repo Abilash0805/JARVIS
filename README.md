@@ -18,9 +18,10 @@ GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
 
 ## What it can do
 
-- **Multi-agent team** — a lead orchestrator decomposes complex jobs and
-  delegates to specialists (**coder**, **operator**, **researcher**,
-  **analyst**), each with a focused toolset and its own free model.
+- **Multi-agent team** — a lead orchestrator asks a **planner** for a
+  step-by-step plan, then delegates each step to specialists (**coder**,
+  **operator**, **researcher**, **analyst**), each with a focused toolset and
+  its own free model. Specialist progress streams live to the CLI and dashboard.
 - **Reason and act in a loop** — JARVIS plans, calls tools, observes results,
   and repeats until your request is done (OpenAI-style function calling).
 - **Never get stuck on a rate limit** — all configured providers form a
@@ -86,16 +87,22 @@ of tools**, and a **preferred free model** (so load spreads across providers):
 
 | Agent | Good at | Tools | Default model |
 |-------|---------|-------|---------------|
+| `planner` | step-by-step plans | none (pure reasoning) | Kimi |
 | `coder` | code, files, shell | filesystem + `run_command` | NVIDIA Nemotron |
 | `operator` | GUI control | screen/click/type/apps + vision | Groq |
 | `researcher` | gathering info | `ask_model` (Gemini/ChatGPT) + memory | GLM |
 | `analyst` | diagnosis | vision + system/process info | Cerebras |
 
+For a complex goal the lead first asks `planner` for a numbered plan, then
+delegates each step to the right specialist and synthesizes the results. As
+specialists work, their tool calls stream live to the CLI feed and the web
+dashboard (tagged like `coder:run_command`).
+
 Specialists can't re-delegate (no infinite loops), and each provider chain
 falls back to the others if its preferred model is rate-limited. Edit the roster
 in `jarvis/agents/specs.py`. If a provider isn't configured, that agent falls
-back to the default brain; if none of an agent's tools are available, it's
-skipped.
+back to the default brain; a spec that asks for tools none of which exist is
+skipped, but a tool-less spec (the planner) is kept as a pure-reasoning agent.
 
 ---
 

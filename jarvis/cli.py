@@ -64,6 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if runtime.scheduler:
         runtime.scheduler.start()
+    if runtime.sink:  # surface nested specialist progress in the live feed
+        runtime.sink.callback = emit
 
     # Optional voice mode (offline / free).
     voice = None

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from jarvis.core.agent import Agent
+from jarvis.core.agent import Agent, EventSink
 from jarvis.core.config import Config, load_config
 from jarvis.core.longterm import LongTermMemory
 from jarvis.core.memory import Memory
@@ -33,6 +33,7 @@ class JarvisRuntime:
     vision_enabled: bool = False
     scheduler: Optional[TaskScheduler] = None
     team: dict[str, Agent] = field(default_factory=dict)
+    sink: Optional[EventSink] = None
 
 
 def build_runtime(enable_web: bool = True) -> JarvisRuntime:
@@ -101,7 +102,8 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
 
     team = build_team(toolset, api_providers, brain,
                       max_iterations=config.max_iterations)
-    toolset.extend(make_delegate_tools(team, DEFAULT_SPECS))
+    sink = EventSink()  # lets specialist progress reach whatever UI is attached
+    toolset.extend(make_delegate_tools(team, DEFAULT_SPECS, sink=sink))
 
     # The lead/orchestrator agent owns the full toolset incl. delegation.
     agent = Agent(
@@ -121,4 +123,5 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
         vision_enabled=vision_provider is not None,
         scheduler=scheduler,
         team=team,
+        sink=sink,
     )

@@ -24,6 +24,22 @@ class AgentEvent:
     detail: str = ""
 
 
+class EventSink:
+    """A re-pointable event relay.
+
+    The UI (CLI / dashboard) sets :attr:`callback`; components deep in the
+    system (e.g. the delegate tool forwarding a specialist's progress) call
+    :meth:`emit` without needing a direct reference to the UI.
+    """
+
+    def __init__(self) -> None:
+        self.callback: Optional[Callable[[AgentEvent], None]] = None
+
+    def emit(self, event: AgentEvent) -> None:
+        if self.callback is not None:
+            self.callback(event)
+
+
 @dataclass
 class Agent:
     """Orchestrates a provider + toolset + memory into a working agent."""
