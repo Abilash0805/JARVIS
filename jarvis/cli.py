@@ -78,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
     say(f"brain: {runtime.brain_name} (+fallback)  |  api models: {', '.join(runtime.api_providers)}")
     if runtime.web_backends:
         say(f"web backends: {', '.join(runtime.web_backends)}")
+    if runtime.team:
+        say(f"team: {', '.join(runtime.team)}")
     say("tools: %d  |  vision: %s  |  confirmation: %s" % (
         len(runtime.agent.toolset), runtime.vision_enabled,
         runtime.config.require_confirmation))

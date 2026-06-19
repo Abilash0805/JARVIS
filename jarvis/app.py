@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from jarvis.core.agent import Agent
@@ -32,6 +32,7 @@ class JarvisRuntime:
     brain_name: str
     vision_enabled: bool = False
     scheduler: Optional[TaskScheduler] = None
+    team: dict[str, Agent] = field(default_factory=dict)
 
 
 def build_runtime(enable_web: bool = True) -> JarvisRuntime:
@@ -74,13 +75,6 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
         include_pc_control=config.include_pc_control,
     )
 
-    agent = Agent(
-        provider=brain,
-        toolset=toolset,
-        max_iterations=config.max_iterations,
-        temperature=config.temperature,
-    )
-
     # Scheduler: scheduled tasks run in a fresh agent (same brain + tools, new
     # memory) so they don't interfere with the live conversation.
     scheduler = TaskScheduler()
@@ -99,6 +93,25 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
 
     toolset.extend(make_scheduler_tools(scheduler, scheduled_runner))
 
+    # Multi-agent team: specialists get a filtered copy of the toolset (snapshot
+    # before delegate tools are added, so specialists can't re-delegate).
+    from jarvis.agents.specs import DEFAULT_SPECS
+    from jarvis.agents.team import build_team
+    from jarvis.tools.agent_tools import make_delegate_tools
+
+    team = build_team(toolset, api_providers, brain,
+                      max_iterations=config.max_iterations)
+    toolset.extend(make_delegate_tools(team, DEFAULT_SPECS))
+
+    # The lead/orchestrator agent owns the full toolset incl. delegation.
+    agent = Agent(
+        provider=brain,
+        toolset=toolset,
+        memory=Memory(build_system_prompt(orchestrator=True)),
+        max_iterations=config.max_iterations,
+        temperature=config.temperature,
+    )
+
     return JarvisRuntime(
         agent=agent,
         config=config,
@@ -107,4 +120,5 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
         brain_name=brain_name,
         vision_enabled=vision_provider is not None,
         scheduler=scheduler,
+        team=team,
     )

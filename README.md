@@ -18,6 +18,9 @@ GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
 
 ## What it can do
 
+- **Multi-agent team** — a lead orchestrator decomposes complex jobs and
+  delegates to specialists (**coder**, **operator**, **researcher**,
+  **analyst**), each with a focused toolset and its own free model.
 - **Reason and act in a loop** — JARVIS plans, calls tools, observes results,
   and repeats until your request is done (OpenAI-style function calling).
 - **Never get stuck on a rate limit** — all configured providers form a
@@ -46,6 +49,8 @@ GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
 
 ```
 jarvis/
+  agents/           multi-agent team: specialist specs + builder
+                    (coder · operator · researcher · analyst)
   providers/        OpenAI-compatible client + per-provider registry
                     (kimi, glm, groq, cerebras, mistral, nvidia)
     providers/router.py  fallback chain across all free providers
@@ -53,6 +58,7 @@ jarvis/
                     filesystem · shell · system_info · pc_control · apps
                     · ai_delegate (ask_model) · vision (see_screen)
                     · memory_tools (remember/recall) · scheduler_tools
+                    · agent_tools (delegate_to_agent)
   integrations/
     web/            Gemini & ChatGPT via Playwright (persistent login)
     desktop/        Claude desktop & Cursor via window focus + keyboard
@@ -69,6 +75,27 @@ All six API providers speak the same OpenAI `/chat/completions` dialect, so they
 share **one** client (`OpenAICompatibleProvider`) parameterised by base URL,
 key, and model. Add another OpenAI-compatible provider by adding one entry to
 `PROVIDER_SPECS` in `jarvis/providers/registry.py`.
+
+### Multi-agent team
+
+JARVIS runs as a **lead orchestrator + specialists**. The lead handles simple
+requests itself; for complex, multi-part jobs it decomposes the work and calls
+`delegate_to_agent` to hand pieces to the right specialist, then synthesizes the
+results. Each specialist is a full agent with its own loop, a **focused subset
+of tools**, and a **preferred free model** (so load spreads across providers):
+
+| Agent | Good at | Tools | Default model |
+|-------|---------|-------|---------------|
+| `coder` | code, files, shell | filesystem + `run_command` | NVIDIA Nemotron |
+| `operator` | GUI control | screen/click/type/apps + vision | Groq |
+| `researcher` | gathering info | `ask_model` (Gemini/ChatGPT) + memory | GLM |
+| `analyst` | diagnosis | vision + system/process info | Cerebras |
+
+Specialists can't re-delegate (no infinite loops), and each provider chain
+falls back to the others if its preferred model is rate-limited. Edit the roster
+in `jarvis/agents/specs.py`. If a provider isn't configured, that agent falls
+back to the default brain; if none of an agent's tools are available, it's
+skipped.
 
 ---
 

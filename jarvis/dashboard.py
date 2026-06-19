@@ -102,6 +102,7 @@ def _make_handler(state: DashboardState):
                     "brain": rt.brain_name,
                     "models": list(rt.api_providers),
                     "web": list(rt.web_backends),
+                    "team": list(rt.team),
                     "tools": len(rt.agent.toolset),
                     "vision": rt.vision_enabled,
                 })

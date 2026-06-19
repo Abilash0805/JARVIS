@@ -57,6 +57,18 @@ class Toolset:
     def get(self, name: str) -> Tool | None:
         return self.tools.get(name)
 
+    def subset(self, names: list[str]) -> "Toolset":
+        """Return a new Toolset containing only the named tools that exist."""
+        sub = Toolset()
+        for name in names:
+            tool = self.tools.get(name)
+            if tool is not None:
+                sub.add(tool)
+        return sub
+
+    def names(self) -> list[str]:
+        return list(self.tools)
+
     def specs(self) -> list[dict[str, Any]]:
         """OpenAI tool specs for every registered tool."""
         return [t.to_openai_spec() for t in self.tools.values()]
