@@ -33,7 +33,17 @@ def make_ai_delegate_tools(
             ask = getattr(backend, "ask", None)
             if ask is None:
                 raise ToolError(f"web backend {name!r} has no ask() method")
-            return ask(prompt)
+            try:
+                return ask(prompt)
+            except Exception as exc:
+                raise ToolError(
+                    f"web backend {name!r} is unavailable right now ({exc}). "
+                    "This is a browser/session problem, not something retrying "
+                    "the same backend will fix. Do not call ask_model with "
+                    f"provider={name!r} again for this task — instead answer "
+                    "from your own knowledge or use an API provider (groq, "
+                    "cerebras, mistral, nvidia)."
+                ) from exc
         raise ToolError(
             f"unknown provider {provider!r}. available: "
             f"{sorted(set(api_providers) | set(web_backends))}"
