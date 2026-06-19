@@ -30,7 +30,7 @@ DEFAULT_SPECS: list[AgentSpec] = [
     AgentSpec(
         name="planner",
         description="Turns a complex goal into a concrete, numbered, step-by-step plan.",
-        provider="kimi",
+        provider="mistral",
         tools=[],  # pure reasoning, intentionally no tools
         system_prompt=(
             "You are the Planner agent. Given a goal, produce a concise, "
@@ -79,7 +79,7 @@ DEFAULT_SPECS: list[AgentSpec] = [
     AgentSpec(
         name="researcher",
         description="Gathers and synthesizes information, incl. asking Gemini/ChatGPT.",
-        provider="glm",
+        provider="groq",
         tools=["ask_model", "list_models", "recall", "remember"],
         system_prompt=(
             "You are the Researcher agent. You gather facts and synthesize "

@@ -23,16 +23,8 @@ class ProviderSpec:
     supports_tools: bool = True
 
 
-# All six are OpenAI-compatible; only the env var names / defaults differ.
+# All four are OpenAI-compatible; only the env var names / defaults differ.
 PROVIDER_SPECS: dict[str, ProviderSpec] = {
-    "kimi": ProviderSpec(
-        "kimi", "KIMI_API_KEY", "KIMI_BASE_URL", "KIMI_MODEL",
-        "https://api.moonshot.ai/v1", "moonshot-v1-8k",
-    ),
-    "glm": ProviderSpec(
-        "glm", "GLM_API_KEY", "GLM_BASE_URL", "GLM_MODEL",
-        "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash",
-    ),
     "groq": ProviderSpec(
         "groq", "GROQ_API_KEY", "GROQ_BASE_URL", "GROQ_MODEL",
         "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile",
@@ -48,7 +40,7 @@ PROVIDER_SPECS: dict[str, ProviderSpec] = {
     "nvidia": ProviderSpec(
         "nvidia", "NVIDIA_API_KEY", "NVIDIA_BASE_URL", "NVIDIA_MODEL",
         "https://integrate.api.nvidia.com/v1",
-        "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        "nvidia/nemotron-3-super-120b-a12b",
     ),
 }
 

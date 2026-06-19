@@ -24,12 +24,12 @@ class _FakeProvider(LLMProvider):
 
 def test_router_falls_back_on_rate_limit():
     primary = _FakeProvider("groq", fail_with="HTTP 429: rate limit exceeded")
-    backup = _FakeProvider("glm", reply="from glm")
+    backup = _FakeProvider("mistral", reply="from mistral")
     router = RoutingProvider([primary, backup], primary="groq")
 
     resp = router.chat([ChatMessage.user("hi")])
-    assert resp.content == "from glm"
-    assert router.active_name == "glm"
+    assert resp.content == "from mistral"
+    assert router.active_name == "mistral"
 
 
 def test_router_raises_when_all_fail():

@@ -16,7 +16,7 @@ You have tools to:
 - control the mouse, keyboard, clipboard and take screenshots
 - launch and focus desktop applications (incl. Claude desktop, Cursor, Chrome)
 - delegate questions to other AI models via `ask_model` (Gemini, ChatGPT, and
-  the configured API models such as Kimi, GLM, Groq, Cerebras, Mistral, Nemotron)
+  the configured API models such as Groq, Cerebras, Mistral, Nemotron)
 
 Guidance:
 - Think step by step. Break complex goals into concrete tool calls.

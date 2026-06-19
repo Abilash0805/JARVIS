@@ -4,8 +4,8 @@ A multi-provider AI assistant that can **control your PC** and **delegate to oth
 AI models**. JARVIS uses one model as its reasoning "brain", exposes your
 computer to it through a safe tool layer (shell, files, keyboard/mouse,
 screenshots, app launching), and can route subtasks to other models — including
-**Gemini** and **ChatGPT** in a real browser, and the free-tier APIs of **Kimi,
-GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
+**Gemini** and **ChatGPT** in a real browser, and the free-tier APIs of **Groq,
+Cerebras, Mistral, and NVIDIA Nemotron**.
 
 > **Target OS:** Windows (PC-control layer is Windows-first; shell/file/API
 > layers are cross-platform). It runs on macOS/Linux too, minus some Windows
@@ -53,7 +53,7 @@ jarvis/
   agents/           multi-agent team: specialist specs + builder
                     (coder · operator · researcher · analyst)
   providers/        OpenAI-compatible client + per-provider registry
-                    (kimi, glm, groq, cerebras, mistral, nvidia)
+                    (groq, cerebras, mistral, nvidia)
     providers/router.py  fallback chain across all free providers
   tools/            the things JARVIS can DO
                     filesystem · shell · system_info · pc_control · apps
@@ -72,7 +72,7 @@ jarvis/
   cli.py            interactive REPL / one-shot mode
 ```
 
-All six API providers speak the same OpenAI `/chat/completions` dialect, so they
+All four API providers speak the same OpenAI `/chat/completions` dialect, so they
 share **one** client (`OpenAICompatibleProvider`) parameterised by base URL,
 key, and model. Add another OpenAI-compatible provider by adding one entry to
 `PROVIDER_SPECS` in `jarvis/providers/registry.py`.
@@ -87,10 +87,10 @@ of tools**, and a **preferred free model** (so load spreads across providers):
 
 | Agent | Good at | Tools | Default model |
 |-------|---------|-------|---------------|
-| `planner` | step-by-step plans | none (pure reasoning) | Kimi |
+| `planner` | step-by-step plans | none (pure reasoning) | Mistral |
 | `coder` | code, files, shell | filesystem + `run_command` | NVIDIA Nemotron |
 | `operator` | GUI control | screen/click/type/apps + vision | Groq |
-| `researcher` | gathering info | `ask_model` (Gemini/ChatGPT) + memory | GLM |
+| `researcher` | gathering info | `ask_model` (Gemini/ChatGPT) + memory | Groq |
 | `analyst` | diagnosis | vision + system/process info | Cerebras |
 
 For a complex goal the lead first asks `planner` for a numbered plan, then
@@ -135,11 +135,9 @@ You only need a key for **at least one** provider. Get free keys from:
 | Provider | Where | Free model (default) |
 |----------|-------|----------------------|
 | Groq     | console.groq.com        | `llama-3.3-70b-versatile` |
-| GLM      | open.bigmodel.cn        | `glm-4-flash` |
 | Cerebras | cloud.cerebras.ai       | `gpt-oss-120b` |
 | Mistral  | console.mistral.ai      | `mistral-small-latest` |
-| Kimi     | platform.moonshot.ai    | `moonshot-v1-8k` |
-| NVIDIA   | build.nvidia.com        | `nvidia/llama-3.1-nemotron-ultra-253b-v1` |
+| NVIDIA   | build.nvidia.com        | `nvidia/nemotron-3-super-120b-a12b` |
 
 Set `JARVIS_DEFAULT_PROVIDER` in `.env` to pick the reasoning brain.
 

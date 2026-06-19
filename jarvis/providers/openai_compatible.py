@@ -1,6 +1,6 @@
 """A single client for every OpenAI-compatible chat API.
 
-Kimi, GLM, Groq, Cerebras, Mistral and NVIDIA NIM all expose the
+Groq, Cerebras, Mistral and NVIDIA NIM all expose the
 ``/chat/completions`` endpoint with the same request/response shape, so one
 implementation parameterised by base URL + key + model covers all of them.
 """
