@@ -1,8 +1,16 @@
-"""Confirmation gate for potentially destructive actions.
+"""Action gate for tool execution.
 
-The gate sits between the agent and any tool marked ``dangerous`` (shell
-commands, PC control, file writes/deletes). In interactive mode it prompts the
-user; in non-interactive mode it follows a configured default.
+By default JARVIS runs **autonomously**: it does not ask the user to confirm
+each action, so it can build whole websites, decks, PDFs and study packs end to
+end without interruption. The only thing that still stops an action is a small
+``hard_blocklist`` of catastrophic, machine-destroying commands — this is an
+accident guard against a model hallucinating something like ``rm -rf /``, not a
+permission prompt. It can be turned off entirely (see ``from_env``).
+
+Modes (controlled by env):
+- ``JARVIS_REQUIRE_CONFIRMATION=true``  -> ask before each dangerous action.
+- ``JARVIS_REQUIRE_CONFIRMATION=false`` (default) -> run without prompting.
+- ``JARVIS_DISABLE_BLOCKLIST=true``     -> remove even the catastrophic guard.
 """
 
 from __future__ import annotations
@@ -13,46 +21,60 @@ from typing import Callable, Optional
 
 
 class SafetyGate:
-    """Decide whether a dangerous action may proceed.
+    """Decide whether an action may proceed.
 
     Parameters
     ----------
     require_confirmation:
-        When True, ask before each dangerous action. When False, allow
-        everything (use only when you trust the task fully).
+        When True, ask before each dangerous action. When False (default),
+        allow actions to run without prompting.
     prompt:
         Callable that asks the user and returns True to allow. Defaults to a
-        terminal y/N prompt. In non-interactive sessions (no TTY) the gate
-        falls back to ``allow_when_noninteractive``.
+        terminal y/N prompt. Only used when ``require_confirmation`` is True.
     allow_when_noninteractive:
-        What to do for a dangerous action when there is no TTY to prompt.
+        What to do for a dangerous action when there is no TTY to prompt and
+        confirmation is required. Defaults to True so headless/scheduled runs
+        keep working.
+    enforce_blocklist:
+        When True (default), refuse the handful of catastrophic commands in
+        ``hard_blocklist`` regardless of mode. Set False to remove every guard.
     """
 
     def __init__(
         self,
-        require_confirmation: bool = True,
+        require_confirmation: bool = False,
         prompt: Optional[Callable[[str], bool]] = None,
-        allow_when_noninteractive: bool = False,
+        allow_when_noninteractive: bool = True,
+        enforce_blocklist: bool = True,
     ) -> None:
         self.require_confirmation = require_confirmation
         self._prompt = prompt or self._default_prompt
         self.allow_when_noninteractive = allow_when_noninteractive
-        # Commands that are never allowed, confirmation or not.
+        self.enforce_blocklist = enforce_blocklist
+        # Catastrophic, irreversible whole-system commands. This is an accident
+        # guard (a model can hallucinate these), not a permission prompt.
         self.hard_blocklist: list[str] = [
             "rm -rf /",
             "rm -rf /*",
+            "rm -rf ~",
             ":(){ :|:& };:",  # fork bomb
             "mkfs",
             "dd if=/dev/zero of=/dev/",
+            "dd if=/dev/random of=/dev/",
+            "> /dev/sda",
             "format c:",
         ]
 
     @classmethod
     def from_env(cls) -> "SafetyGate":
-        require = os.getenv("JARVIS_REQUIRE_CONFIRMATION", "true").lower() != "false"
-        return cls(require_confirmation=require)
+        # Autonomous by default: only prompt if explicitly asked to.
+        require = os.getenv("JARVIS_REQUIRE_CONFIRMATION", "false").lower() == "true"
+        enforce = os.getenv("JARVIS_DISABLE_BLOCKLIST", "false").lower() != "true"
+        return cls(require_confirmation=require, enforce_blocklist=enforce)
 
     def is_hard_blocked(self, action: str) -> bool:
+        if not self.enforce_blocklist:
+            return False
         lowered = action.lower()
         return any(pattern in lowered for pattern in self.hard_blocklist)
 

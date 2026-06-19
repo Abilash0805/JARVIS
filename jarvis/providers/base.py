@@ -91,7 +91,7 @@ class ProviderResponse:
 class LLMProvider(ABC):
     """Interface every model backend implements."""
 
-    #: short, stable identifier (e.g. "groq", "kimi")
+    #: short, stable identifier (e.g. "groq", "cerebras")
     name: str
     #: model id sent to the API
     model: str

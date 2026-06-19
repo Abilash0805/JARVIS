@@ -12,6 +12,7 @@ Everything is guarded so importing JARVIS never requires these packages.
 
 from __future__ import annotations
 
+import base64
 import platform
 import shutil
 import subprocess
@@ -99,12 +100,24 @@ class Voice:
             f"$s.Rate = {sapi_rate}; $s.Speak('{safe}')"
         )
         exe = shutil.which("powershell") or "powershell.exe"
-        subprocess.run(
-            [exe, "-NoProfile", "-NonInteractive", "-Command", script],
-            check=True,
-            capture_output=True,
-            timeout=120,
-        )
+        # JARVIS's replies routinely contain em dashes/curly quotes; passing
+        # them through -Command as a raw command-line argument is at the
+        # mercy of the console codepage and Windows argv quoting, which can
+        # mangle or truncate them and make PowerShell fail to parse the
+        # script (exit code 1). -EncodedCommand carries the script as
+        # base64'd UTF-16LE text instead, sidestepping quoting/encoding
+        # entirely.
+        encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+        try:
+            subprocess.run(
+                [exe, "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or b"").decode("utf-8", "replace").strip()
+            raise RuntimeError(f"{exc}: {stderr}" if stderr else str(exc)) from exc
 
     def _speak_pyttsx3(self, text: str) -> None:
         import pyttsx3
