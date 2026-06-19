@@ -304,25 +304,111 @@ def _build_pdf(path: str, title: str, blocks: Any, theme: str = "professional") 
 
 
 # --------------------------------------------------------------------------- #
-# Website
+# Website — themed CSS (futuristic by default, plus clean/dark/minimal)
 # --------------------------------------------------------------------------- #
-_DEFAULT_CSS = """\
-:root { --fg:#1a1a2e; --muted:#555; --accent:#0066ff; --bg:#ffffff; }
-* { box-sizing: border-box; }
-body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-  color:var(--fg); background:var(--bg); line-height:1.6; }
-header { background:var(--fg); color:#fff; padding:1rem 2rem; }
-header nav a { color:#fff; margin-right:1.25rem; text-decoration:none; opacity:.9; }
-header nav a:hover { opacity:1; text-decoration:underline; }
-main { max-width:960px; margin:0 auto; padding:2rem; }
-h1,h2,h3 { line-height:1.25; }
-a { color:var(--accent); }
-.card { border:1px solid #e3e3e3; border-radius:12px; padding:1.25rem; margin:1rem 0;
-  box-shadow:0 1px 3px rgba(0,0,0,.05); }
-footer { color:var(--muted); text-align:center; padding:2rem; font-size:.9rem; }
-button,.btn { background:var(--accent); color:#fff; border:0; padding:.6rem 1.1rem;
-  border-radius:8px; cursor:pointer; text-decoration:none; display:inline-block; }
+_WEB_FUTURISTIC_CSS = """\
+:root{--bg:#05070d;--panel:rgba(13,20,33,.72);--line:rgba(56,189,248,.18);
+  --cyan:#38e8ff;--teal:#5eead4;--ice:#bce7ff;--fg:#d7e6f7;--muted:#6f86a8;
+  --glow:0 0 22px rgba(56,232,255,.40);}
+*{box-sizing:border-box;}
+body{margin:0;color:var(--fg);background:var(--bg);line-height:1.65;
+  font-family:"Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif;}
+body::before{content:"";position:fixed;inset:0;z-index:-1;
+  background:radial-gradient(1100px 640px at 80% -10%,rgba(56,232,255,.12),transparent 60%),
+    radial-gradient(860px 560px at -6% 110%,rgba(94,234,212,.10),transparent 55%),var(--bg);}
+body::after{content:"";position:fixed;inset:0;z-index:-1;opacity:.5;
+  background-image:linear-gradient(rgba(56,189,248,.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(56,189,248,.05) 1px,transparent 1px);
+  background-size:46px 46px;
+  -webkit-mask-image:radial-gradient(circle at 50% 30%,#000 30%,transparent 85%);
+  mask-image:radial-gradient(circle at 50% 30%,#000 30%,transparent 85%);}
+header{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:1.25rem;
+  padding:1rem 2rem;background:rgba(8,14,24,.72);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);}
+header nav a{color:var(--ice);margin-right:1.25rem;text-decoration:none;font-size:.95rem;
+  letter-spacing:.5px;opacity:.85;transition:color .2s,text-shadow .2s;}
+header nav a:hover{opacity:1;color:var(--cyan);text-shadow:0 0 12px rgba(56,232,255,.6);}
+main{max-width:980px;margin:0 auto;padding:3rem 2rem;}
+h1,h2,h3{line-height:1.2;color:#eaf9ff;letter-spacing:.5px;
+  text-shadow:0 0 18px rgba(56,232,255,.25);}
+h1{font-size:2.4rem;}
+a{color:var(--cyan);}
+p{color:#c2d3e8;}
+.card{border:1px solid var(--line);border-radius:16px;padding:1.5rem;margin:1.25rem 0;
+  background:var(--panel);backdrop-filter:blur(8px);
+  box-shadow:0 8px 28px rgba(0,0,0,.35);transition:transform .18s,border-color .2s,box-shadow .2s;}
+.card:hover{transform:translateY(-3px);border-color:rgba(56,232,255,.45);
+  box-shadow:0 12px 36px rgba(0,0,0,.45),var(--glow);}
+footer{color:var(--muted);text-align:center;padding:2.5rem;font-size:.9rem;
+  border-top:1px solid var(--line);margin-top:2rem;}
+button,.btn{background:linear-gradient(135deg,#7ef0ff,#38e8ff 45%,#22b8d6);color:#021018;
+  border:0;padding:.7rem 1.4rem;border-radius:12px;cursor:pointer;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;text-decoration:none;display:inline-block;
+  box-shadow:var(--glow);transition:transform .12s,filter .2s;}
+button:hover,.btn:hover{transform:translateY(-1px);filter:brightness(1.08);}
 """
+
+_WEB_CLEAN_CSS = """\
+:root{--fg:#1a1a2e;--muted:#555;--accent:#0066ff;--bg:#ffffff;--soft:#f6f8fc;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  color:var(--fg);background:var(--bg);line-height:1.65;}
+header{position:sticky;top:0;background:#fff;border-bottom:1px solid #e7ebf2;
+  padding:1rem 2rem;box-shadow:0 1px 8px rgba(0,0,0,.04);}
+header nav a{color:var(--fg);margin-right:1.4rem;text-decoration:none;font-weight:600;opacity:.85;}
+header nav a:hover{opacity:1;color:var(--accent);}
+main{max-width:960px;margin:0 auto;padding:2.5rem 2rem;}
+h1,h2,h3{line-height:1.25;}
+a{color:var(--accent);}
+.card{border:1px solid #e7ebf2;border-radius:14px;padding:1.4rem;margin:1.1rem 0;
+  background:var(--soft);box-shadow:0 1px 3px rgba(0,0,0,.05);transition:transform .15s,box-shadow .2s;}
+.card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.08);}
+footer{color:var(--muted);text-align:center;padding:2rem;font-size:.9rem;border-top:1px solid #eef1f6;}
+button,.btn{background:var(--accent);color:#fff;border:0;padding:.65rem 1.2rem;border-radius:10px;
+  cursor:pointer;text-decoration:none;display:inline-block;font-weight:600;}
+button:hover,.btn:hover{filter:brightness(1.05);}
+"""
+
+_WEB_DARK_CSS = """\
+:root{--fg:#e5e7eb;--muted:#9ca3af;--accent:#38bdf8;--bg:#0b0f17;--panel:#111826;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  color:var(--fg);background:var(--bg);line-height:1.65;}
+header{position:sticky;top:0;background:var(--panel);border-bottom:1px solid #1e293b;padding:1rem 2rem;}
+header nav a{color:var(--fg);margin-right:1.4rem;text-decoration:none;opacity:.85;}
+header nav a:hover{opacity:1;color:var(--accent);}
+main{max-width:960px;margin:0 auto;padding:2.5rem 2rem;}
+h1,h2,h3{line-height:1.25;color:#f1f5f9;}
+a{color:var(--accent);}
+.card{border:1px solid #1e293b;border-radius:14px;padding:1.4rem;margin:1.1rem 0;background:var(--panel);}
+footer{color:var(--muted);text-align:center;padding:2rem;font-size:.9rem;border-top:1px solid #1e293b;}
+button,.btn{background:var(--accent);color:#041018;border:0;padding:.65rem 1.2rem;border-radius:10px;
+  cursor:pointer;text-decoration:none;display:inline-block;font-weight:700;}
+"""
+
+_WEB_MINIMAL_CSS = """\
+:root{--fg:#111;--muted:#666;--accent:#111;--bg:#fff;}
+*{box-sizing:border-box;}
+body{margin:0;font-family:Georgia,"Times New Roman",serif;color:var(--fg);background:var(--bg);line-height:1.7;}
+header{padding:1.5rem 2rem;border-bottom:1px solid #eee;}
+header nav a{color:var(--fg);margin-right:1.4rem;text-decoration:none;border-bottom:1px solid transparent;}
+header nav a:hover{border-bottom-color:var(--fg);}
+main{max-width:720px;margin:0 auto;padding:3rem 2rem;}
+h1,h2,h3{line-height:1.25;font-weight:600;}
+a{color:var(--accent);}
+.card{border-top:1px solid #eee;padding:1.25rem 0;margin:1rem 0;}
+footer{color:var(--muted);text-align:center;padding:2.5rem;font-size:.85rem;}
+button,.btn{background:var(--fg);color:#fff;border:0;padding:.6rem 1.2rem;border-radius:2px;
+  cursor:pointer;text-decoration:none;display:inline-block;}
+"""
+
+_WEB_THEMES = {
+    "futuristic": _WEB_FUTURISTIC_CSS,
+    "clean": _WEB_CLEAN_CSS,
+    "dark": _WEB_DARK_CSS,
+    "minimal": _WEB_MINIMAL_CSS,
+}
+_DEFAULT_CSS = _WEB_FUTURISTIC_CSS  # default look matches the JARVIS dashboard
 
 _PAGE_TEMPLATE = """\
 <!doctype html>
@@ -345,7 +431,8 @@ _PAGE_TEMPLATE = """\
 
 
 def _build_website(
-    directory: str, pages: Any, site_name: str = "My Site", css: str = ""
+    directory: str, pages: Any, site_name: str = "My Site", css: str = "",
+    theme: str = "futuristic",
 ) -> str:
     pages = _coerce(pages, "pages")
     if not isinstance(pages, list) or not pages:
@@ -364,7 +451,9 @@ def _build_website(
     nav = "".join(nav_links)
     footer = f"&copy; {site_name}"
 
-    (root / "styles.css").write_text(css or _DEFAULT_CSS, encoding="utf-8")
+    # An explicit `css` override always wins; otherwise pick the theme.
+    theme_css = _WEB_THEMES.get(theme, _DEFAULT_CSS)
+    (root / "styles.css").write_text(css or theme_css, encoding="utf-8")
 
     written = ["styles.css"]
     for pg in pages:
@@ -378,7 +467,11 @@ def _build_website(
         (root / fn).write_text(html, encoding="utf-8")
         written.append(fn)
 
-    return f"created website '{site_name}' in {root} ({len(written)} files: {', '.join(written)})"
+    used = "custom" if css else theme
+    return (
+        f"created website '{site_name}' ({used} theme) in {root} "
+        f"({len(written)} files: {', '.join(written)})"
+    )
 
 
 def make_document_tools(gate: SafetyGate) -> list[Tool]:
@@ -398,11 +491,12 @@ def make_document_tools(gate: SafetyGate) -> list[Tool]:
         return _build_pdf(path, title, blocks, theme)
 
     def create_website(
-        directory: str, pages: Any, site_name: str = "My Site", css: str = ""
+        directory: str, pages: Any, site_name: str = "My Site", css: str = "",
+        theme: str = "futuristic",
     ) -> str:
         if not gate.confirm(f"CREATE website in {directory}"):
             raise ToolError("create_website denied by safety gate")
-        return _build_website(directory, pages, site_name, css)
+        return _build_website(directory, pages, site_name, css, theme)
 
     _str = {"type": "string"}
     _theme_prop = {
@@ -470,14 +564,22 @@ def make_document_tools(gate: SafetyGate) -> list[Tool]:
             "create_website",
             "Scaffold a complete multi-page static website into a directory. "
             "'pages' is a list of {filename, title, body_html}; a shared nav, "
-            "responsive styles.css, and footer are generated. Pass your own 'css' "
-            "to override the default theme.",
+            "responsive styles.css, and footer are generated. Choose 'theme': "
+            "futuristic (default — dark glassmorphism with neon-cyan accents, an "
+            "animated grid backdrop and glowing cards, matching the JARVIS look), "
+            "clean (light & professional), dark, or minimal (serif, editorial). "
+            "Pass your own 'css' to fully override the theme.",
             {
                 "type": "object",
                 "properties": {
                     "directory": {"type": "string", "description": "output folder"},
                     "site_name": _str,
-                    "css": {"type": "string", "description": "optional CSS override"},
+                    "theme": {
+                        "type": "string",
+                        "enum": ["futuristic", "clean", "dark", "minimal"],
+                        "description": "visual theme (default: futuristic)",
+                    },
+                    "css": {"type": "string", "description": "optional full CSS override"},
                     "pages": {
                         "type": "array",
                         "description": "list of {filename, title, body_html}",

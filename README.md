@@ -36,8 +36,10 @@ Cerebras, Mistral, and NVIDIA Nemotron**.
   numbers — not PowerPoint's bland default template), `create_pdf` (reports,
   study materials, handouts with a themed header/footer and accent rule), and
   `create_website` (complete multi-page static sites with shared nav +
-  responsive CSS). Both `create_pptx` and `create_pdf` take a `theme`:
-  `professional`, `modern`, `dark`, or `minimal`.
+  responsive CSS). `create_pptx`/`create_pdf` take a `theme`
+  (`professional`, `modern`, `dark`, `minimal`); `create_website` takes a
+  `theme` too — `futuristic` (default: dark glassmorphism + neon-cyan accents
+  matching the dashboard), `clean`, `dark`, or `minimal`.
 - **Control the PC** — run commands, read/write files, move the mouse, type,
   press hotkeys, take screenshots, manage the clipboard, launch & focus apps.
 - **See the screen** — `see_screen` screenshots and describes the UI with a
