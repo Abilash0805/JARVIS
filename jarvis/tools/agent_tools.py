@@ -47,6 +47,30 @@ def make_delegate_tools(
         result = worker.run(task, on_event=_relay(name))
         return f"[{name}] {result}"
 
+    def _run_one(item: dict) -> str:
+        name = str(item.get("agent", "")).lower().strip()
+        task = str(item.get("task", "")).strip()
+        worker = team.get(name)
+        if worker is None:
+            return f"[{name or '?'}] ERROR: unknown agent (have {sorted(team)})"
+        if not task:
+            return f"[{name}] ERROR: empty task"
+        try:
+            return f"[{name}] {worker.run(task, on_event=_relay(name))}"
+        except Exception as exc:  # noqa: BLE001 - report, don't abort the batch
+            return f"[{name}] ERROR: {type(exc).__name__}: {exc}"
+
+    def delegate_parallel(tasks: list) -> str:
+        if not isinstance(tasks, list) or not tasks:
+            raise ToolError("tasks must be a non-empty list of {agent, task}")
+        # Specialists are independent agents (separate memory + provider), so
+        # independent subtasks run concurrently across different free models.
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=min(len(tasks), 5)) as pool:
+            results = list(pool.map(_run_one, tasks))  # order preserved
+        return "\n\n".join(results)
+
     def list_agents() -> str:
         if not team:
             return "no specialist agents available"
@@ -73,6 +97,32 @@ def make_delegate_tools(
                 "required": ["agent", "task"],
             },
             delegate_to_agent,
+        ),
+        Tool(
+            "delegate_parallel",
+            "Run several INDEPENDENT subtasks at the same time, each on its own "
+            "specialist (and model). Use this when steps don't depend on each "
+            "other — it's much faster than calling delegate_to_agent one by "
+            "one. Results come back labelled per agent, in order.",
+            {
+                "type": "object",
+                "properties": {
+                    "tasks": {
+                        "type": "array",
+                        "description": "independent subtasks to run concurrently",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "agent": {"type": "string", "enum": available},
+                                "task": {"type": "string"},
+                            },
+                            "required": ["agent", "task"],
+                        },
+                    }
+                },
+                "required": ["tasks"],
+            },
+            delegate_parallel,
         ),
         Tool(
             "list_agents", "List the specialist agents and what each is good at.",

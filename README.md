@@ -59,7 +59,7 @@ jarvis/
                     filesystem · shell · system_info · pc_control · apps
                     · ai_delegate (ask_model) · vision (see_screen)
                     · memory_tools (remember/recall) · scheduler_tools
-                    · agent_tools (delegate_to_agent)
+                    · agent_tools (delegate_to_agent / delegate_parallel)
   integrations/
     web/            Gemini & ChatGPT via Playwright (persistent login)
     desktop/        Claude desktop & Cursor via window focus + keyboard
@@ -94,8 +94,10 @@ of tools**, and a **preferred free model** (so load spreads across providers):
 | `analyst` | diagnosis | vision + system/process info | Cerebras |
 
 For a complex goal the lead first asks `planner` for a numbered plan, then
-delegates each step to the right specialist and synthesizes the results. As
-specialists work, their tool calls stream live to the CLI feed and the web
+delegates each step to the right specialist and synthesizes the results.
+Independent steps run **concurrently** via `delegate_parallel` — each on its own
+specialist and model — so they finish in the time of the slowest, not the sum.
+As specialists work, their tool calls stream live to the CLI feed and the web
 dashboard (tagged like `coder:run_command`).
 
 Specialists can't re-delegate (no infinite loops), and each provider chain

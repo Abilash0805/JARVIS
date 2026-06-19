@@ -68,6 +68,42 @@ def test_delegate_relays_events_to_sink():
     assert any(e.kind == "thinking" and e.text.startswith("[coder]") for e in seen)
 
 
+def test_delegate_parallel_runs_all_in_order():
+    ts = _toolset()
+    specs = [
+        AgentSpec("coder", "code", "you code", tools=["read_file"]),
+        AgentSpec("researcher", "research", "you research", tools=["ask_model"]),
+    ]
+    team = build_team(ts, {}, _Echo(), specs=specs)
+    tools = {t.name: t for t in make_delegate_tools(team, specs)}
+
+    out = tools["delegate_parallel"].run({"tasks": [
+        {"agent": "coder", "task": "task-A"},
+        {"agent": "researcher", "task": "task-B"},
+    ]})
+    # Both ran, results are labelled, and order is preserved.
+    assert "[coder] done:task-A" in out
+    assert "[researcher] done:task-B" in out
+    assert out.index("[coder]") < out.index("[researcher]")
+
+
+def test_delegate_parallel_isolates_errors():
+    ts = _toolset()
+    specs = [AgentSpec("coder", "code", "you code", tools=["read_file"])]
+    team = build_team(ts, {}, _Echo(), specs=specs)
+    tools = {t.name: t for t in make_delegate_tools(team, specs)}
+
+    out = tools["delegate_parallel"].run({"tasks": [
+        {"agent": "coder", "task": "ok"},
+        {"agent": "ghost", "task": "fail"},
+    ]})
+    assert "[coder] done:ok" in out
+    assert "unknown agent" in out  # bad task reported, batch still completes
+
+    with pytest.raises(ToolError):
+        tools["delegate_parallel"].run({"tasks": []})
+
+
 def test_delegate_runs_specialist():
     ts = _toolset()
     specs = [AgentSpec("coder", "code", "you code", tools=["read_file"])]
