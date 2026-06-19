@@ -49,13 +49,17 @@ DEFAULT_SPECS: list[AgentSpec] = [
         tools=[
             "read_file", "write_file", "append_file", "delete_file", "list_dir",
             "run_command", "system_info",
+            "create_pptx", "create_pdf", "create_website",
         ],
         system_prompt=(
             "You are the Coder agent. You write correct, idiomatic code, create "
-            "and edit files, and run shell commands to build and test. Work "
-            "step by step, verify your changes (run it / read it back), and "
-            "report exactly what you did and any command output. Match existing "
-            "code style. Never guess paths — list directories when unsure."
+            "and edit files, and run shell commands to build and test. You also "
+            "produce finished deliverables: PowerPoint decks (create_pptx), PDFs "
+            "and study materials (create_pdf), and complete multi-page websites "
+            "(create_website). Work step by step, verify your changes (run it / "
+            "read it back), and report exactly what you did and any command "
+            "output. Match existing code style. Never guess paths — list "
+            "directories when unsure."
         ),
     ),
     AgentSpec(

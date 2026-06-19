@@ -82,9 +82,9 @@ def main(argv: list[str] | None = None) -> int:
         say(f"web backends: {', '.join(runtime.web_backends)}")
     if runtime.team:
         say(f"team: {', '.join(runtime.team)}")
-    say("tools: %d  |  vision: %s  |  confirmation: %s" % (
-        len(runtime.agent.toolset), runtime.vision_enabled,
-        runtime.config.require_confirmation))
+    mode = "ask-first" if runtime.config.require_confirmation else "autonomous"
+    say("tools: %d  |  vision: %s  |  mode: %s" % (
+        len(runtime.agent.toolset), runtime.vision_enabled, mode))
     say("Type your request, or 'exit' to quit.\n")
 
     # One-shot mode: `python -m jarvis "do something"`

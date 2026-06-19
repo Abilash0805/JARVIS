@@ -27,6 +27,13 @@ Cerebras, Mistral, and NVIDIA Nemotron**.
 - **Never get stuck on a rate limit** — all configured providers form a
   fallback chain; when one free tier throttles, JARVIS transparently switches
   to the next.
+- **Runs autonomously** — by default JARVIS acts without asking permission for
+  every step, so it builds whole deliverables end to end. Only a tiny accident
+  guard (catastrophic commands like `rm -rf /`) still stops it. Flip
+  `JARVIS_REQUIRE_CONFIRMATION=true` if you'd rather approve each action.
+- **Build finished deliverables** — `create_pptx` (PowerPoint decks),
+  `create_pdf` (reports, study materials, handouts), and `create_website`
+  (complete multi-page static sites with shared nav + responsive CSS).
 - **Control the PC** — run commands, read/write files, move the mouse, type,
   press hotkeys, take screenshots, manage the clipboard, launch & focus apps.
 - **See the screen** — `see_screen` screenshots and describes the UI with a
@@ -57,6 +64,7 @@ jarvis/
     providers/router.py  fallback chain across all free providers
   tools/            the things JARVIS can DO
                     filesystem · shell · system_info · pc_control · apps
+                    · documents (create_pptx / create_pdf / create_website)
                     · ai_delegate (ask_model) · vision (see_screen)
                     · memory_tools (remember/recall) · scheduler_tools
                     · agent_tools (delegate_to_agent / delegate_parallel)
@@ -123,8 +131,9 @@ run.bat          :: interactive   (run.bat --wake / --voice / --dashboard)
 ```bash
 # 1. Install
 python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -e ".[all]"                            # core + pc + web extras
+pip install -e ".[all]"                            # core + pc + web + documents
 playwright install chromium                        # for Gemini/ChatGPT web
+# document builders only: pip install -e ".[documents]"  (python-pptx + reportlab)
 
 # 2. Configure keys
 cp .env.example .env        # then edit .env and fill in the keys you have
@@ -174,19 +183,28 @@ summarize my unread emails"* → JARVIS calls `schedule_task`; results land in
 
 Inside the loop, JARVIS decides which tools to call. Examples:
 
+- *"make a 5-slide deck on our Q2 results"* → `create_pptx`
+- *"turn these notes into a study-guide PDF"* → `create_pdf`
+- *"build me a portfolio website with home + about pages"* → `create_website`
 - *"open Cursor and create a new Python file"* → `open_app` + PC control
 - *"what's eating my CPU?"* → `list_processes`
 - *"ask chatgpt to explain X, then summarize it for me"* → `ask_model` (web)
-- *"clean up *.tmp in Downloads"* → `run_command` (asks you to confirm first)
+- *"clean up *.tmp in Downloads"* → `run_command`
 
 ---
 
-## Safety
+## Autonomy & safety
 
-Dangerous tools are gated. With `JARVIS_REQUIRE_CONFIRMATION=true` (default)
-JARVIS asks before each shell command, file write/delete, click, keystroke, or
-app launch. A **hard blocklist** (`rm -rf /`, fork bombs, `mkfs`, `format c:`,
-…) is always refused. Set the env var to `false` only for tasks you fully trust.
+JARVIS is **autonomous by default** (`JARVIS_REQUIRE_CONFIRMATION=false`): it
+runs shell commands, writes files, drives the PC, and builds decks/PDFs/sites
+without stopping to ask, so it can finish multi-step jobs on its own. The only
+remaining guard is a small **hard blocklist** of catastrophic, irreversible
+commands (`rm -rf /`, fork bombs, `mkfs`, `format c:`, …) that exists to catch a
+model accidentally emitting something machine-destroying.
+
+- Want to approve each action? Set `JARVIS_REQUIRE_CONFIRMATION=true`.
+- Want zero guards at all? Set `JARVIS_DISABLE_BLOCKLIST=true` (not recommended —
+  this removes even the catastrophic-command guard).
 
 ---
 
