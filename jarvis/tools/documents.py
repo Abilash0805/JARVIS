@@ -39,12 +39,32 @@ def _coerce(value: Any, what: str) -> Any:
 
 
 # --------------------------------------------------------------------------- #
-# PowerPoint
+# PowerPoint — hand-drawn theme (not the bland default template)
 # --------------------------------------------------------------------------- #
-def _build_pptx(path: str, title: str, slides: Any, subtitle: str = "") -> str:
+# (background, heading/accent-bar, title text, body text, muted/footer text)
+_PPTX_THEMES = {
+    "professional": ("FFFFFF", "1F3A5F", "1F3A5F", "1A1A2E", "6B7280"),
+    "modern":       ("FFFFFF", "0F766E", "0F766E", "1F2937", "6B7280"),
+    "dark":         ("111827", "1F2937", "38BDF8", "E5E7EB", "9CA3AF"),
+    "minimal":      ("FFFFFF", "111111", "111111", "111111", "6B7280"),
+}
+_PPTX_ACCENTS = {  # thin highlight bar / bullet glyph color per theme
+    "professional": "C9A227",
+    "modern": "FF6B6B",
+    "dark": "38BDF8",
+    "minimal": "2563EB",
+}
+
+
+def _build_pptx(
+    path: str, title: str, slides: Any, subtitle: str = "", theme: str = "professional"
+) -> str:
     try:
         from pptx import Presentation
-        from pptx.util import Inches, Pt
+        from pptx.dml.color import RGBColor
+        from pptx.enum.shapes import MSO_SHAPE
+        from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+        from pptx.util import Emu, Inches, Pt
     except ImportError as exc:  # pragma: no cover - dep missing
         raise ToolError(
             "python-pptx not installed. Run: pip install python-pptx"
@@ -54,50 +74,129 @@ def _build_pptx(path: str, title: str, slides: Any, subtitle: str = "") -> str:
     if not isinstance(slides, list):
         raise ToolError("slides must be a list of {title, bullets} objects")
 
+    bg_hex, bar_hex, title_hex, body_hex, muted_hex = _PPTX_THEMES.get(
+        theme, _PPTX_THEMES["professional"]
+    )
+    accent_hex = _PPTX_ACCENTS.get(theme, _PPTX_ACCENTS["professional"])
+    rgb = lambda h: RGBColor.from_string(h)  # noqa: E731
+
     prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+    blank = prs.slide_layouts[6]
+    W, H = prs.slide_width, prs.slide_height
 
-    # Title slide.
-    title_layout = prs.slide_layouts[0]
-    s = prs.slides.add_slide(title_layout)
-    s.shapes.title.text = title
-    if subtitle and len(s.placeholders) > 1:
-        s.placeholders[1].text = subtitle
+    def fill_bg(slide, color_hex: str) -> None:
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = rgb(color_hex)
 
-    # Content slides.
-    bullet_layout = prs.slide_layouts[1]
+    def add_rect(slide, left, top, width, height, color_hex: str):
+        shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = rgb(color_hex)
+        shape.line.fill.background()
+        shape.shadow.inherit = False
+        return shape
+
+    def add_text(
+        slide, left, top, width, height, text, *, size, color_hex, bold=False,
+        align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
+    ):
+        box = slide.shapes.add_textbox(left, top, width, height)
+        tf = box.text_frame
+        tf.word_wrap = True
+        tf.vertical_anchor = anchor
+        p = tf.paragraphs[0]
+        p.text = text
+        p.alignment = align
+        p.font.size = Pt(size)
+        p.font.bold = bold
+        p.font.color.rgb = rgb(color_hex)
+        return box
+
+    total = len(slides) + 1
+
+    # --- Title slide: full-bleed color panel with an accent rule. ---
+    s = prs.slides.add_slide(blank)
+    fill_bg(s, bar_hex)
+    add_rect(s, 0, H - Emu(int(H * 0.012)), W, Emu(int(H * 0.012)), accent_hex)
+    add_text(
+        s, Inches(1), Inches(2.7), W - Inches(2), Inches(1.4), title,
+        size=44, color_hex="FFFFFF", bold=True, align=PP_ALIGN.CENTER,
+        anchor=MSO_ANCHOR.MIDDLE,
+    )
+    if subtitle:
+        add_text(
+            s, Inches(1), Inches(4.0), W - Inches(2), Inches(0.8), subtitle,
+            size=20, color_hex="E5E7EB", align=PP_ALIGN.CENTER,
+        )
+
+    # --- Content slides: accent bar, themed title, bulleted body, footer. ---
     for i, slide in enumerate(slides, 1):
         if not isinstance(slide, dict):
             raise ToolError(f"slide {i} must be an object with title/bullets")
-        s = prs.slides.add_slide(bullet_layout)
-        s.shapes.title.text = str(slide.get("title", f"Slide {i}"))
-        body = s.placeholders[1].text_frame
-        body.clear()
+        s = prs.slides.add_slide(blank)
+        fill_bg(s, bg_hex)
+        add_rect(s, 0, 0, W, Inches(0.12), bar_hex)
+        add_text(
+            s, Inches(0.7), Inches(0.4), W - Inches(1.4), Inches(0.9),
+            str(slide.get("title", f"Slide {i}")),
+            size=30, color_hex=title_hex, bold=True,
+        )
+        add_rect(s, Inches(0.7), Inches(1.25), Inches(1.0), Pt(3), accent_hex)
+
         bullets = slide.get("bullets") or []
         if isinstance(bullets, str):
             bullets = [bullets]
+        body_box = s.shapes.add_textbox(
+            Inches(0.7), Inches(1.6), W - Inches(1.4), H - Inches(2.2)
+        )
+        tf = body_box.text_frame
+        tf.word_wrap = True
         for j, bullet in enumerate(bullets):
-            para = body.paragraphs[0] if j == 0 else body.add_paragraph()
-            para.text = str(bullet)
-            para.font.size = Pt(18)
+            p = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
+            p.text = f"•  {bullet}"
+            p.font.size = Pt(18)
+            p.font.color.rgb = rgb(body_hex)
+            p.space_after = Pt(10)
+
         notes = slide.get("notes")
         if notes:
             s.notes_slide.notes_text_frame.text = str(notes)
 
+        add_text(
+            s, Inches(0.7), H - Inches(0.5), Inches(4), Inches(0.35), title,
+            size=10, color_hex=muted_hex,
+        )
+        add_text(
+            s, W - Inches(2.2), H - Inches(0.5), Inches(1.5), Inches(0.35),
+            f"{i + 1} / {total}", size=10, color_hex=muted_hex, align=PP_ALIGN.RIGHT,
+        )
+
     p = _resolve(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(p))
-    return f"created PowerPoint with {len(slides) + 1} slides at {p}"
+    return f"created PowerPoint ({theme} theme) with {total} slides at {p}"
 
 
 # --------------------------------------------------------------------------- #
-# PDF
+# PDF — colored header bar, accent headings, page numbers in the footer.
 # --------------------------------------------------------------------------- #
-def _build_pdf(path: str, title: str, blocks: Any) -> str:
+_PDF_THEMES = {  # (primary/heading color, accent/bar color, muted footer color)
+    "professional": ("#1F3A5F", "#C9A227", "#6B7280"),
+    "modern":        ("#0F766E", "#FF6B6B", "#6B7280"),
+    "dark":          ("#1F2937", "#38BDF8", "#6B7280"),
+    "minimal":       ("#111111", "#2563EB", "#6B7280"),
+}
+
+
+def _build_pdf(path: str, title: str, blocks: Any, theme: str = "professional") -> str:
     try:
-        from reportlab.lib.enums import TA_LEFT
+        from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
-        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.platypus import (
+            Flowable,
             ListFlowable,
             ListItem,
             Paragraph,
@@ -111,15 +210,71 @@ def _build_pdf(path: str, title: str, blocks: Any) -> str:
     if not isinstance(blocks, list):
         raise ToolError("blocks must be a list of {type, text|items} objects")
 
+    primary_hex, accent_hex, muted_hex = _PDF_THEMES.get(
+        theme, _PDF_THEMES["professional"]
+    )
+    primary, accent, muted = (
+        colors.HexColor(primary_hex), colors.HexColor(accent_hex), colors.HexColor(muted_hex)
+    )
+
     p = _resolve(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    doc = SimpleDocTemplate(str(p), pagesize=letter, title=title)
+    doc = SimpleDocTemplate(
+        str(p), pagesize=letter, title=title,
+        topMargin=70, bottomMargin=50, leftMargin=56, rightMargin=56,
+    )
+
+    def header_footer(canvas, _doc) -> None:
+        canvas.saveState()
+        width, height = letter
+        canvas.setFillColor(primary)
+        canvas.rect(0, height - 14, width, 14, fill=1, stroke=0)
+        canvas.setFillColor(accent)
+        canvas.rect(0, height - 16, width, 2, fill=1, stroke=0)
+        canvas.setFillColor(muted)
+        canvas.setFont("Helvetica", 8)
+        canvas.drawString(56, 28, title)
+        canvas.drawRightString(width - 56, 28, f"Page {canvas.getPageNumber()}")
+        canvas.restoreState()
+
     styles = getSampleStyleSheet()
+    heading1 = ParagraphStyle(
+        "ThemedHeading1", parent=styles["Heading1"], textColor=primary,
+    )
+    heading2 = ParagraphStyle(
+        "ThemedHeading2", parent=styles["Heading2"], textColor=primary,
+    )
+    title_style = ParagraphStyle(
+        "ThemedTitle", parent=styles["Title"], textColor=primary,
+    )
     story: list[Any] = []
 
+    class _AccentRule(Flowable):
+        """A thin colored horizontal rule, used under the title."""
+
+        def __init__(self, color, height: float = 2.2, width_fraction: float = 0.18) -> None:
+            super().__init__()
+            self._color = color
+            self.height = height
+            self._width_fraction = width_fraction
+
+        def wrap(self, avail_width, avail_height):  # noqa: ARG002 - reportlab API
+            self.width = avail_width
+            return avail_width, self.height
+
+        def draw(self) -> None:  # noqa: D401 - reportlab API
+            self.canv.saveState()
+            self.canv.setFillColor(self._color)
+            self.canv.rect(
+                0, 0, self.width * self._width_fraction, self.height, fill=1, stroke=0
+            )
+            self.canv.restoreState()
+
     if title:
-        story.append(Paragraph(title, styles["Title"]))
-        story.append(Spacer(1, 12))
+        story.append(Paragraph(title, title_style))
+        story.append(Spacer(1, 4))
+        story.append(_AccentRule(accent))
+        story.append(Spacer(1, 14))
 
     for blk in blocks:
         if not isinstance(blk, dict):
@@ -127,9 +282,9 @@ def _build_pdf(path: str, title: str, blocks: Any) -> str:
         kind = str(blk.get("type", "text")).lower()
         if kind == "heading":
             story.append(Spacer(1, 8))
-            story.append(Paragraph(str(blk.get("text", "")), styles["Heading1"]))
+            story.append(Paragraph(str(blk.get("text", "")), heading1))
         elif kind == "subheading":
-            story.append(Paragraph(str(blk.get("text", "")), styles["Heading2"]))
+            story.append(Paragraph(str(blk.get("text", "")), heading2))
         elif kind in ("bullets", "list"):
             items = blk.get("items") or []
             if isinstance(items, str):
@@ -144,8 +299,8 @@ def _build_pdf(path: str, title: str, blocks: Any) -> str:
             story.append(Paragraph(str(blk.get("text", "")), styles["BodyText"]))
         story.append(Spacer(1, 6))
 
-    doc.build(story)
-    return f"created PDF with {len(blocks)} blocks at {p}"
+    doc.build(story, onFirstPage=header_footer, onLaterPages=header_footer)
+    return f"created PDF ({theme} theme) with {len(blocks)} blocks at {p}"
 
 
 # --------------------------------------------------------------------------- #
@@ -229,15 +384,18 @@ def _build_website(
 def make_document_tools(gate: SafetyGate) -> list[Tool]:
     """Tools that produce finished artifacts (decks, PDFs, websites)."""
 
-    def create_pptx(path: str, title: str, slides: Any, subtitle: str = "") -> str:
+    def create_pptx(
+        path: str, title: str, slides: Any, subtitle: str = "",
+        theme: str = "professional",
+    ) -> str:
         if not gate.confirm(f"CREATE PowerPoint at {path}"):
             raise ToolError("create_pptx denied by safety gate")
-        return _build_pptx(path, title, slides, subtitle)
+        return _build_pptx(path, title, slides, subtitle, theme)
 
-    def create_pdf(path: str, title: str, blocks: Any) -> str:
+    def create_pdf(path: str, title: str, blocks: Any, theme: str = "professional") -> str:
         if not gate.confirm(f"CREATE PDF at {path}"):
             raise ToolError("create_pdf denied by safety gate")
-        return _build_pdf(path, title, blocks)
+        return _build_pdf(path, title, blocks, theme)
 
     def create_website(
         directory: str, pages: Any, site_name: str = "My Site", css: str = ""
@@ -247,18 +405,30 @@ def make_document_tools(gate: SafetyGate) -> list[Tool]:
         return _build_website(directory, pages, site_name, css)
 
     _str = {"type": "string"}
+    _theme_prop = {
+        "type": "string",
+        "enum": ["professional", "modern", "dark", "minimal"],
+        "description": (
+            "visual theme — colored backgrounds/accent bars/footers instead of a "
+            "bland default template (default: professional)"
+        ),
+    }
     return [
         Tool(
             "create_pptx",
-            "Build a PowerPoint (.pptx) deck. 'slides' is a list of objects like "
+            "Build a polished, themed PowerPoint (.pptx) deck — not the bland "
+            "default template. 'slides' is a list of objects like "
             '{"title": str, "bullets": [str, ...], "notes": str (optional)}. '
-            "A title slide is added automatically. Great for presentations.",
+            "A title slide, colored accent bars, and footer page numbers are added "
+            "automatically. Choose 'theme': professional, modern, dark, or minimal. "
+            "Great for presentations.",
             {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "output .pptx path"},
                     "title": {"type": "string", "description": "deck title"},
                     "subtitle": _str,
+                    "theme": _theme_prop,
                     "slides": {
                         "type": "array",
                         "description": "list of {title, bullets[, notes]} slides",
@@ -272,15 +442,19 @@ def make_document_tools(gate: SafetyGate) -> list[Tool]:
         ),
         Tool(
             "create_pdf",
-            "Build a PDF document. 'blocks' is an ordered list of content blocks: "
+            "Build a polished, themed PDF document — colored header bar, accent "
+            "rule under the title, and page-numbered footer, not a bare default "
+            "layout. 'blocks' is an ordered list of content blocks: "
             '{"type": "heading"|"subheading"|"text"|"bullets", "text": str} or '
             '{"type": "bullets", "items": [str, ...]}. '
+            "Choose 'theme': professional, modern, dark, or minimal. "
             "Ideal for reports, study notes, and handouts.",
             {
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "output .pdf path"},
                     "title": {"type": "string", "description": "document title"},
+                    "theme": _theme_prop,
                     "blocks": {
                         "type": "array",
                         "description": "ordered content blocks",

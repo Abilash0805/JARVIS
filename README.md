@@ -31,9 +31,13 @@ Cerebras, Mistral, and NVIDIA Nemotron**.
   every step, so it builds whole deliverables end to end. Only a tiny accident
   guard (catastrophic commands like `rm -rf /`) still stops it. Flip
   `JARVIS_REQUIRE_CONFIRMATION=true` if you'd rather approve each action.
-- **Build finished deliverables** — `create_pptx` (PowerPoint decks),
-  `create_pdf` (reports, study materials, handouts), and `create_website`
-  (complete multi-page static sites with shared nav + responsive CSS).
+- **Build finished, professionally-styled deliverables** — `create_pptx`
+  (PowerPoint decks with a colored title slide, accent bars, and footer page
+  numbers — not PowerPoint's bland default template), `create_pdf` (reports,
+  study materials, handouts with a themed header/footer and accent rule), and
+  `create_website` (complete multi-page static sites with shared nav +
+  responsive CSS). Both `create_pptx` and `create_pdf` take a `theme`:
+  `professional`, `modern`, `dark`, or `minimal`.
 - **Control the PC** — run commands, read/write files, move the mouse, type,
   press hotkeys, take screenshots, manage the clipboard, launch & focus apps.
 - **See the screen** — `see_screen` screenshots and describes the UI with a
