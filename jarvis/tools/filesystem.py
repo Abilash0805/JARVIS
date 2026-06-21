@@ -1,9 +1,17 @@
-"""File-system tools: read, write, append, list, and delete files."""
+"""File-system tools: read, write, append, list, and delete files.
+
+By default these tools can touch any path the OS user running JARVIS can
+touch — there's no sandbox. If you want JARVIS confined to a working
+directory (recommended when running autonomously), set ``JARVIS_FS_ROOT`` to
+a directory; every path is then resolved and checked to be inside it before
+any read/write/delete proceeds.
+"""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Optional
 
 from jarvis.tools.base import Tool, ToolError
 from jarvis.utils.safety import SafetyGate
@@ -15,9 +23,31 @@ def _resolve(path: str) -> Path:
     return Path(os.path.expanduser(path)).resolve()
 
 
+def _fs_root() -> Optional[Path]:
+    raw = os.getenv("JARVIS_FS_ROOT", "").strip()
+    if not raw:
+        return None
+    return Path(os.path.expanduser(raw)).resolve()
+
+
+def _check_confined(p: Path, root: Optional[Path]) -> None:
+    if root is None:
+        return
+    try:
+        p.relative_to(root)
+    except ValueError:
+        raise ToolError(
+            f"path {p} is outside the confined workspace {root} "
+            "(JARVIS_FS_ROOT is set)"
+        )
+
+
 def make_filesystem_tools(gate: SafetyGate) -> list[Tool]:
+    root = _fs_root()
+
     def read_file(path: str) -> str:
         p = _resolve(path)
+        _check_confined(p, root)
         if not p.is_file():
             raise ToolError(f"not a file: {p}")
         data = p.read_bytes()[:_MAX_READ_BYTES]
@@ -28,6 +58,7 @@ def make_filesystem_tools(gate: SafetyGate) -> list[Tool]:
 
     def list_dir(path: str = ".") -> str:
         p = _resolve(path)
+        _check_confined(p, root)
         if not p.is_dir():
             raise ToolError(f"not a directory: {p}")
         entries = []
@@ -39,6 +70,7 @@ def make_filesystem_tools(gate: SafetyGate) -> list[Tool]:
 
     def write_file(path: str, content: str) -> str:
         p = _resolve(path)
+        _check_confined(p, root)
         if not gate.confirm(f"WRITE file {p} ({len(content)} chars)"):
             raise ToolError("write denied by safety gate")
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -47,6 +79,7 @@ def make_filesystem_tools(gate: SafetyGate) -> list[Tool]:
 
     def append_file(path: str, content: str) -> str:
         p = _resolve(path)
+        _check_confined(p, root)
         if not gate.confirm(f"APPEND to file {p} ({len(content)} chars)"):
             raise ToolError("append denied by safety gate")
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -56,6 +89,7 @@ def make_filesystem_tools(gate: SafetyGate) -> list[Tool]:
 
     def delete_file(path: str) -> str:
         p = _resolve(path)
+        _check_confined(p, root)
         if not p.exists():
             raise ToolError(f"does not exist: {p}")
         if not gate.confirm(f"DELETE {p}"):

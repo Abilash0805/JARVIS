@@ -17,6 +17,10 @@ pyperclip>=1.8       # clipboard
 # --- Web automation (Gemini / ChatGPT in the browser) ---
 playwright>=1.42     # run `playwright install chromium` after install
 
+# --- Document & artifact builders (PPTX / PDF / websites) ---
+python-pptx>=0.6.21  # PowerPoint generation
+reportlab>=4.0       # PDF generation
+
 # --- Voice (optional, off by default; 100% free / offline-capable) ---
 # pyttsx3 uses the OS speech engine (no key). Sphinx STT is fully offline.
 # pyttsx3>=2.90

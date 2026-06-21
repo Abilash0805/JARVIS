@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional
 
 from jarvis.tools.apps import make_app_tools
 from jarvis.tools.base import Toolset
+from jarvis.tools.documents import make_document_tools
 from jarvis.tools.filesystem import make_filesystem_tools
 from jarvis.tools.pc_control import make_pc_control_tools
 from jarvis.tools.shell import make_shell_tools
@@ -43,6 +44,7 @@ def default_toolset(
     ts = Toolset()
     ts.extend(make_filesystem_tools(gate))
     ts.extend(make_shell_tools(gate))
+    ts.extend(make_document_tools(gate))
     ts.extend(make_system_info_tools())
     if include_pc_control:
         ts.extend(make_pc_control_tools(gate))

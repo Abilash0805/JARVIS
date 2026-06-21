@@ -41,18 +41,34 @@ class BrowserSession:
             headless=self.headless,
             args=["--disable-blink-features=AutomationControlled"],
         )
+        # If the user closes the browser window (or it crashes), drop our
+        # stale reference so the next call relaunches instead of repeatedly
+        # raising "Target page, context or browser has been closed".
+        self._context.on("close", lambda _ctx: self._reset())
         return self._context
 
     def page(self):
-        ctx = self.start()
-        if ctx.pages:
-            return ctx.pages[0]
-        return ctx.new_page()
+        try:
+            ctx = self.start()
+            pages = [p for p in ctx.pages if not p.is_closed()]
+            return pages[0] if pages else ctx.new_page()
+        except Exception:
+            # Stale/closed context that didn't fire the close event in time
+            # (crash, killed process) — relaunch once and retry.
+            self._reset()
+            ctx = self.start()
+            return ctx.new_page()
+
+    def _reset(self) -> None:
+        self._context = None
+        if self._pw is not None:
+            try:
+                self._pw.stop()
+            except Exception:
+                pass
+            self._pw = None
 
     def close(self) -> None:
         if self._context is not None:
             self._context.close()
-            self._context = None
-        if self._pw is not None:
-            self._pw.stop()
-            self._pw = None
+        self._reset()

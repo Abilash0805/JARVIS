@@ -47,6 +47,13 @@ def make_pc_control_tools(gate: SafetyGate) -> list[Tool]:
         pg.screenshot(path, **kwargs)
         return f"saved screenshot to {path}"
 
+    def get_screen_size() -> str:
+        """Report the screen resolution so clicks can use valid coordinates."""
+        pg = _require_pyautogui()
+        w, h = pg.size()
+        x, y = pg.position()
+        return f"screen size: {w}x{h}; mouse at ({x}, {y})"
+
     def move_mouse(x: int, y: int, duration: float = 0.2) -> str:
         pg = _require_pyautogui()
         pg.moveTo(x, y, duration=duration)
@@ -56,11 +63,55 @@ def make_pc_control_tools(gate: SafetyGate) -> list[Tool]:
         pg = _require_pyautogui()
         if not gate.confirm(f"CLICK {button} x{clicks} at ({x},{y})"):
             raise ToolError("click denied by safety gate")
+        # Move first, then click, so the OS reliably registers the event at the
+        # target (a bare pg.click(x, y) can race the cursor move on Windows).
         if x >= 0 and y >= 0:
-            pg.click(x=x, y=y, clicks=clicks, button=button)
+            pg.moveTo(x, y, duration=0.1)
+            pg.click(x=x, y=y, clicks=clicks, button=button, interval=0.05)
         else:
-            pg.click(clicks=clicks, button=button)
-        return f"clicked {button} {clicks}x"
+            pg.click(clicks=clicks, button=button, interval=0.05)
+        where = f" at ({x},{y})" if x >= 0 and y >= 0 else ""
+        return f"clicked {button} {clicks}x{where}"
+
+    def double_click(x: int = -1, y: int = -1, button: str = "left") -> str:
+        return click(x=x, y=y, button=button, clicks=2)
+
+    def right_click(x: int = -1, y: int = -1) -> str:
+        return click(x=x, y=y, button="right", clicks=1)
+
+    def scroll(amount: int, x: int = -1, y: int = -1) -> str:
+        """Scroll vertically. Positive = up, negative = down."""
+        pg = _require_pyautogui()
+        if x >= 0 and y >= 0:
+            pg.moveTo(x, y, duration=0.1)
+        pg.scroll(amount)
+        return f"scrolled {amount}"
+
+    def drag_mouse(x: int, y: int, duration: float = 0.3,
+                   button: str = "left") -> str:
+        """Press and drag from the current position to (x, y)."""
+        pg = _require_pyautogui()
+        if not gate.confirm(f"DRAG to ({x},{y})"):
+            raise ToolError("drag denied by safety gate")
+        pg.dragTo(x, y, duration=duration, button=button)
+        return f"dragged to ({x}, {y})"
+
+    def click_image(image_path: str, confidence: float = 0.8,
+                    button: str = "left", clicks: int = 1) -> str:
+        """Find an on-screen image (a saved screenshot crop) and click it."""
+        pg = _require_pyautogui()
+        if not gate.confirm(f"CLICK image {image_path}"):
+            raise ToolError("click denied by safety gate")
+        try:
+            location = pg.locateCenterOnScreen(image_path, confidence=confidence)
+        except Exception as exc:  # noqa: BLE001 - needs opencv for confidence
+            raise ToolError(
+                f"could not locate image (install opencv-python for matching): {exc}"
+            )
+        if location is None:
+            raise ToolError(f"image {image_path!r} not found on screen")
+        pg.click(x=location.x, y=location.y, clicks=clicks, button=button)
+        return f"clicked image at ({location.x}, {location.y})"
 
     def type_text(text: str, interval: float = 0.02) -> str:
         pg = _require_pyautogui()
@@ -107,18 +158,61 @@ def make_pc_control_tools(gate: SafetyGate) -> list[Tool]:
              "Capture the screen (or a region 'x,y,width,height') to a PNG file.",
              {"type": "object", "properties": {"region": _str}},
              screenshot),
+        Tool("get_screen_size",
+             "Report the screen resolution and current mouse position. Call "
+             "this before clicking so coordinates stay on-screen.",
+             {"type": "object", "properties": {}},
+             get_screen_size),
         Tool("move_mouse", "Move the mouse cursor to absolute screen coordinates.",
              {"type": "object",
               "properties": {"x": _int, "y": _int, "duration": {"type": "number"}},
               "required": ["x", "y"]},
              move_mouse),
         Tool("click",
-             "Click the mouse. Omit x/y to click at the current position.",
+             "Click the mouse at absolute screen coordinates (x, y). Omit x/y "
+             "to click at the current position. Set clicks=2 for double-click "
+             "and button='right' for a context menu.",
              {"type": "object",
               "properties": {"x": _int, "y": _int,
                              "button": {"type": "string", "enum": ["left", "right", "middle"]},
                              "clicks": _int}},
              click, dangerous=True),
+        Tool("double_click",
+             "Double-click at absolute screen coordinates (x, y).",
+             {"type": "object",
+              "properties": {"x": _int, "y": _int,
+                             "button": {"type": "string", "enum": ["left", "right", "middle"]}}},
+             double_click, dangerous=True),
+        Tool("right_click",
+             "Right-click at absolute screen coordinates (x, y) to open a "
+             "context menu.",
+             {"type": "object", "properties": {"x": _int, "y": _int}},
+             right_click, dangerous=True),
+        Tool("scroll",
+             "Scroll the mouse wheel. Positive amount scrolls up, negative "
+             "scrolls down. Optionally move to (x, y) first.",
+             {"type": "object",
+              "properties": {"amount": _int, "x": _int, "y": _int},
+              "required": ["amount"]},
+             scroll, dangerous=True),
+        Tool("drag_mouse",
+             "Press and drag from the current mouse position to (x, y).",
+             {"type": "object",
+              "properties": {"x": _int, "y": _int, "duration": {"type": "number"},
+                             "button": {"type": "string", "enum": ["left", "right", "middle"]}},
+              "required": ["x", "y"]},
+             drag_mouse, dangerous=True),
+        Tool("click_image",
+             "Locate an image (a saved PNG crop of a button/icon) on screen "
+             "and click its center. Needs opencv-python for the 'confidence' "
+             "match.",
+             {"type": "object",
+              "properties": {"image_path": _str,
+                             "confidence": {"type": "number"},
+                             "button": {"type": "string", "enum": ["left", "right", "middle"]},
+                             "clicks": _int},
+              "required": ["image_path"]},
+             click_image, dangerous=True),
         Tool("type_text", "Type a string of text at the keyboard focus.",
              {"type": "object",
               "properties": {"text": _str, "interval": {"type": "number"}},

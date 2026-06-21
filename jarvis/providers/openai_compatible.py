@@ -1,6 +1,6 @@
 """A single client for every OpenAI-compatible chat API.
 
-Kimi, GLM, Groq, Cerebras, Mistral and NVIDIA NIM all expose the
+Groq, Cerebras, Mistral and NVIDIA NIM all expose the
 ``/chat/completions`` endpoint with the same request/response shape, so one
 implementation parameterised by base URL + key + model covers all of them.
 """
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import mimetypes
+import time
 from pathlib import Path
 from typing import Any, Optional
 
@@ -21,6 +22,14 @@ from jarvis.providers.base import (
     ProviderResponse,
     ToolCall,
 )
+
+# Retry transient network/server failures before giving up on this provider —
+# the router will also fall through to the *next* provider, but a single
+# dropped connection or momentary 503 shouldn't immediately burn the
+# preferred one.
+_MAX_RETRIES = 2
+_RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
+_BACKOFF_BASE_SECONDS = 0.5
 
 
 class OpenAICompatibleProvider(LLMProvider):
@@ -73,23 +82,7 @@ class OpenAICompatibleProvider(LLMProvider):
             payload["tool_choice"] = kwargs.pop("tool_choice", "auto")
         payload.update(kwargs)
 
-        url = f"{self._base_url}/chat/completions"
-        try:
-            with httpx.Client(timeout=self._timeout) as client:
-                resp = client.post(url, headers=self._headers, json=payload)
-        except httpx.HTTPError as exc:  # network-level failure
-            raise ProviderError(f"{self.name}: request failed: {exc}") from exc
-
-        if resp.status_code >= 400:
-            raise ProviderError(
-                f"{self.name}: HTTP {resp.status_code}: {resp.text[:500]}"
-            )
-
-        try:
-            data = resp.json()
-        except ValueError as exc:
-            raise ProviderError(f"{self.name}: invalid JSON response") from exc
-
+        data = self._post("/chat/completions", payload)
         return self._parse(data)
 
     def describe_image(
@@ -125,15 +118,41 @@ class OpenAICompatibleProvider(LLMProvider):
                 }
             ],
         }
-        url = f"{self._base_url}/chat/completions"
-        try:
-            with httpx.Client(timeout=self._timeout) as client:
-                resp = client.post(url, headers=self._headers, json=payload)
-        except httpx.HTTPError as exc:
-            raise ProviderError(f"{self.name}: vision request failed: {exc}") from exc
-        if resp.status_code >= 400:
-            raise ProviderError(f"{self.name}: HTTP {resp.status_code}: {resp.text[:500]}")
-        return self._parse(resp.json()).content or "<no description>"
+        data = self._post("/chat/completions", payload)
+        return self._parse(data).content or "<no description>"
+
+    def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        url = f"{self._base_url}{path}"
+        last_exc: Optional[Exception] = None
+
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                with httpx.Client(timeout=self._timeout) as client:
+                    resp = client.post(url, headers=self._headers, json=payload)
+            except httpx.HTTPError as exc:  # network-level failure
+                last_exc = exc
+                if attempt < _MAX_RETRIES:
+                    time.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+                raise ProviderError(f"{self.name}: request failed: {exc}") from exc
+
+            if resp.status_code >= 400:
+                if resp.status_code in _RETRY_STATUS and attempt < _MAX_RETRIES:
+                    last_exc = ProviderError(
+                        f"{self.name}: HTTP {resp.status_code}: {resp.text[:300]}"
+                    )
+                    time.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+                raise ProviderError(
+                    f"{self.name}: HTTP {resp.status_code}: {resp.text[:500]}"
+                )
+
+            try:
+                return resp.json()
+            except ValueError as exc:
+                raise ProviderError(f"{self.name}: invalid JSON response") from exc
+
+        raise ProviderError(f"{self.name}: request failed after retries: {last_exc}")
 
     @staticmethod
     def _parse(data: dict[str, Any]) -> ProviderResponse:

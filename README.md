@@ -4,8 +4,8 @@ A multi-provider AI assistant that can **control your PC** and **delegate to oth
 AI models**. JARVIS uses one model as its reasoning "brain", exposes your
 computer to it through a safe tool layer (shell, files, keyboard/mouse,
 screenshots, app launching), and can route subtasks to other models — including
-**Gemini** and **ChatGPT** in a real browser, and the free-tier APIs of **Kimi,
-GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
+**Gemini** and **ChatGPT** in a real browser, and the free-tier APIs of **Groq,
+Cerebras, Mistral, and NVIDIA Nemotron**.
 
 > **Target OS:** Windows (PC-control layer is Windows-first; shell/file/API
 > layers are cross-platform). It runs on macOS/Linux too, minus some Windows
@@ -25,10 +25,26 @@ GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
 - **Reason and act in a loop** — JARVIS plans, calls tools, observes results,
   and repeats until your request is done (OpenAI-style function calling).
 - **Never get stuck on a rate limit** — all configured providers form a
-  fallback chain; when one free tier throttles, JARVIS transparently switches
-  to the next.
-- **Control the PC** — run commands, read/write files, move the mouse, type,
-  press hotkeys, take screenshots, manage the clipboard, launch & focus apps.
+  fallback chain; when one throttles or errors, JARVIS automatically retries
+  with backoff, then transparently switches to the next free provider.
+- **Runs autonomously** — by default JARVIS acts without asking permission for
+  every step, so it builds whole deliverables end to end. Only a tiny accident
+  guard (catastrophic commands like `rm -rf /`, disk-wiping `dd`/`format`,
+  fork bombs) still stops it. Flip `JARVIS_REQUIRE_CONFIRMATION=true` if you'd
+  rather approve each action, or set `JARVIS_FS_ROOT` to confine file tools to
+  one directory.
+- **Build finished, professionally-styled deliverables** — `create_pptx`
+  (PowerPoint decks with a colored title slide, accent bars, and footer page
+  numbers — not PowerPoint's bland default template), `create_pdf` (reports,
+  study materials, handouts with a themed header/footer and accent rule), and
+  `create_website` (complete multi-page static sites with shared nav +
+  responsive CSS). `create_pptx`/`create_pdf` take a `theme`
+  (`professional`, `modern`, `dark`, `minimal`); `create_website` takes a
+  `theme` too — `futuristic` (default: dark glassmorphism + neon-cyan accents
+  matching the dashboard), `clean`, `dark`, or `minimal`.
+- **Control the PC** — run commands, read/write files, move the mouse, click
+  (left/right/double), scroll, drag, type, press hotkeys, take screenshots,
+  manage the clipboard, and launch, focus & close apps/windows.
 - **See the screen** — `see_screen` screenshots and describes the UI with a
   free vision model, so JARVIS can act on what's actually there.
 - **Remember across sessions** — `remember`/`recall` persist facts and
@@ -42,7 +58,10 @@ GLM, Groq, Cerebras, Mistral, and NVIDIA Nemotron**.
 - **Use other AIs as tools** — `ask_model` routes a subtask to any configured
   backend: API models, or Gemini/ChatGPT driven in a browser.
 - **Stay safe** — every dangerous action (shell, writes, clicks, keystrokes,
-  launches) passes through a confirmation gate with a hard blocklist.
+  launches) passes through a confirmation gate with a hardened blocklist
+  (whitespace/case-normalized + regex, not naive substring matching) for
+  catastrophic, machine-destroying commands. Optionally confine filesystem
+  tools to one directory with `JARVIS_FS_ROOT`.
 
 ---
 
@@ -53,10 +72,12 @@ jarvis/
   agents/           multi-agent team: specialist specs + builder
                     (coder · operator · researcher · analyst)
   providers/        OpenAI-compatible client + per-provider registry
-                    (kimi, glm, groq, cerebras, mistral, nvidia)
+                    (groq, cerebras, mistral, nvidia)
     providers/router.py  fallback chain across all free providers
   tools/            the things JARVIS can DO
-                    filesystem · shell · system_info · pc_control · apps
+                    filesystem (optionally confined via JARVIS_FS_ROOT)
+                    · shell · system_info · pc_control · apps
+                    · documents (create_pptx / create_pdf / create_website)
                     · ai_delegate (ask_model) · vision (see_screen)
                     · memory_tools (remember/recall) · scheduler_tools
                     · agent_tools (delegate_to_agent / delegate_parallel)
@@ -72,10 +93,12 @@ jarvis/
   cli.py            interactive REPL / one-shot mode
 ```
 
-All six API providers speak the same OpenAI `/chat/completions` dialect, so they
+All four API providers speak the same OpenAI `/chat/completions` dialect, so they
 share **one** client (`OpenAICompatibleProvider`) parameterised by base URL,
 key, and model. Add another OpenAI-compatible provider by adding one entry to
-`PROVIDER_SPECS` in `jarvis/providers/registry.py`.
+`PROVIDER_SPECS` in `jarvis/providers/registry.py`. The client automatically
+retries transient network errors and 429/5xx responses with backoff before
+giving up on that provider.
 
 ### Multi-agent team
 
@@ -87,10 +110,10 @@ of tools**, and a **preferred free model** (so load spreads across providers):
 
 | Agent | Good at | Tools | Default model |
 |-------|---------|-------|---------------|
-| `planner` | step-by-step plans | none (pure reasoning) | Kimi |
+| `planner` | step-by-step plans | none (pure reasoning) | Mistral |
 | `coder` | code, files, shell | filesystem + `run_command` | NVIDIA Nemotron |
 | `operator` | GUI control | screen/click/type/apps + vision | Groq |
-| `researcher` | gathering info | `ask_model` (Gemini/ChatGPT) + memory | GLM |
+| `researcher` | gathering info | `ask_model` (Gemini/ChatGPT) + memory | Groq |
 | `analyst` | diagnosis | vision + system/process info | Cerebras |
 
 For a complex goal the lead first asks `planner` for a numbered plan, then
@@ -123,8 +146,9 @@ run.bat          :: interactive   (run.bat --wake / --voice / --dashboard)
 ```bash
 # 1. Install
 python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -e ".[all]"                            # core + pc + web extras
+pip install -e ".[all]"                            # core + pc + web + documents
 playwright install chromium                        # for Gemini/ChatGPT web
+# document builders only: pip install -e ".[documents]"  (python-pptx + reportlab)
 
 # 2. Configure keys
 cp .env.example .env        # then edit .env and fill in the keys you have
@@ -135,11 +159,9 @@ You only need a key for **at least one** provider. Get free keys from:
 | Provider | Where | Free model (default) |
 |----------|-------|----------------------|
 | Groq     | console.groq.com        | `llama-3.3-70b-versatile` |
-| GLM      | open.bigmodel.cn        | `glm-4-flash` |
-| Cerebras | cloud.cerebras.ai       | `llama-3.3-70b` |
+| Cerebras | cloud.cerebras.ai       | `gpt-oss-120b` |
 | Mistral  | console.mistral.ai      | `mistral-small-latest` |
-| Kimi     | platform.moonshot.ai    | `moonshot-v1-8k` |
-| NVIDIA   | build.nvidia.com        | `nvidia/llama-3.1-nemotron-ultra-253b-v1` |
+| NVIDIA   | build.nvidia.com        | `nvidia/nemotron-3-super-120b-a12b` |
 
 Set `JARVIS_DEFAULT_PROVIDER` in `.env` to pick the reasoning brain.
 
@@ -176,19 +198,28 @@ summarize my unread emails"* → JARVIS calls `schedule_task`; results land in
 
 Inside the loop, JARVIS decides which tools to call. Examples:
 
+- *"make a 5-slide deck on our Q2 results"* → `create_pptx`
+- *"turn these notes into a study-guide PDF"* → `create_pdf`
+- *"build me a portfolio website with home + about pages"* → `create_website`
 - *"open Cursor and create a new Python file"* → `open_app` + PC control
 - *"what's eating my CPU?"* → `list_processes`
 - *"ask chatgpt to explain X, then summarize it for me"* → `ask_model` (web)
-- *"clean up *.tmp in Downloads"* → `run_command` (asks you to confirm first)
+- *"clean up *.tmp in Downloads"* → `run_command`
 
 ---
 
-## Safety
+## Autonomy & safety
 
-Dangerous tools are gated. With `JARVIS_REQUIRE_CONFIRMATION=true` (default)
-JARVIS asks before each shell command, file write/delete, click, keystroke, or
-app launch. A **hard blocklist** (`rm -rf /`, fork bombs, `mkfs`, `format c:`,
-…) is always refused. Set the env var to `false` only for tasks you fully trust.
+JARVIS is **autonomous by default** (`JARVIS_REQUIRE_CONFIRMATION=false`): it
+runs shell commands, writes files, drives the PC, and builds decks/PDFs/sites
+without stopping to ask, so it can finish multi-step jobs on its own. The only
+remaining guard is a small **hard blocklist** of catastrophic, irreversible
+commands (`rm -rf /`, fork bombs, `mkfs`, `format c:`, …) that exists to catch a
+model accidentally emitting something machine-destroying.
+
+- Want to approve each action? Set `JARVIS_REQUIRE_CONFIRMATION=true`.
+- Want zero guards at all? Set `JARVIS_DISABLE_BLOCKLIST=true` (not recommended —
+  this removes even the catastrophic-command guard).
 
 ---
 

@@ -9,8 +9,10 @@ from pathlib import Path
 
 @dataclass
 class Config:
-    default_provider: str = "groq"
-    require_confirmation: bool = True
+    # Empty string means "no explicit choice" — app.py then uses whichever
+    # configured provider was found first.
+    default_provider: str = ""
+    require_confirmation: bool = False
     include_pc_control: bool = True
     max_iterations: int = 12
     temperature: float = 0.7
@@ -33,9 +35,9 @@ def load_config(env_path: str | os.PathLike[str] | None = None) -> Config:
         pass  # python-dotenv optional; rely on real environment
 
     return Config(
-        default_provider=os.getenv("JARVIS_DEFAULT_PROVIDER", "groq").lower(),
-        require_confirmation=os.getenv("JARVIS_REQUIRE_CONFIRMATION", "true").lower()
-        != "false",
+        default_provider=os.getenv("JARVIS_DEFAULT_PROVIDER", "").lower(),
+        require_confirmation=os.getenv("JARVIS_REQUIRE_CONFIRMATION", "false").lower()
+        == "true",
         include_pc_control=os.getenv("JARVIS_INCLUDE_PC_CONTROL", "true").lower()
         != "false",
         max_iterations=int(os.getenv("JARVIS_MAX_ITERATIONS", "12")),

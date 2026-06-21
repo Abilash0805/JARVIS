@@ -48,12 +48,14 @@ def build_runtime(enable_web: bool = True) -> JarvisRuntime:
     # Pick the preferred brain, then chain all providers behind it so free-tier
     # rate limits fall through to a working backend automatically.
     brain_name = config.default_provider
-    if brain_name not in api_providers:
+    if not brain_name:
         brain_name = next(iter(api_providers))
+    elif brain_name not in api_providers:
         logger.warning(
             "default provider %r not configured; using %r",
-            config.default_provider, brain_name,
+            config.default_provider, next(iter(api_providers)),
         )
+        brain_name = next(iter(api_providers))
     brain = RoutingProvider(list(api_providers.values()), primary=brain_name)
 
     # Optional browser AIs (Gemini/ChatGPT).

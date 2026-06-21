@@ -69,3 +69,21 @@ def test_specs_render():
     assert all(s["type"] == "function" for s in specs)
     names = {s["function"]["name"] for s in specs}
     assert {"read_file", "run_command", "system_info", "open_app"} <= names
+    # Closing apps/windows and richer mouse control are available too.
+    assert {"close_app", "close_window"} <= names
+    assert {"click", "double_click", "right_click", "scroll",
+            "get_screen_size"} <= names
+    # Document builders are always available.
+    assert {"create_pptx", "create_pdf", "create_website"} <= names
+
+
+def test_autonomous_by_default():
+    # Default gate does not prompt and lets actions proceed.
+    gate = SafetyGate()
+    assert gate.require_confirmation is False
+    assert gate.confirm("WRITE file /tmp/x") is True
+    # ...but still blocks catastrophic commands.
+    assert gate.confirm("rm -rf /") is False
+    # Disabling the blocklist removes even that guard.
+    open_gate = SafetyGate(enforce_blocklist=False)
+    assert open_gate.confirm("rm -rf /") is True
