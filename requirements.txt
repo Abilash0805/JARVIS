@@ -12,6 +12,7 @@ pyautogui>=0.9.54    # keyboard / mouse / screenshot
 pygetwindow>=0.0.9   # window focus & enumeration
 psutil>=5.9          # process & system info
 pyperclip>=1.8       # clipboard
+opencv-python>=4.8   # image matching for click_image (locate-on-screen)
 # pywin32>=306       # Windows-only; uncomment on Windows for richer control
 
 # --- Web automation (Gemini / ChatGPT in the browser) ---
