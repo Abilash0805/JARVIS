@@ -45,16 +45,27 @@ if errorlevel 1 (
 echo [4/4] Preparing your .env config...
 if not exist ".env" (
   copy ".env.example" ".env" >nul
-  echo     Created .env  --  open it and add at least one free API key ^(Groq is easiest^).
+  echo     Created .env  --  opening it now so you can paste a free API key.
+  echo     Groq is easiest: get one free at https://console.groq.com/keys
+  echo     Paste it after GROQ_API_KEY=  then save and close Notepad to continue.
+  start /wait notepad ".env"
 ) else (
   echo     .env already exists, leaving it as-is.
 )
 
 echo.
 echo === Setup complete ===
-echo  1. Edit .env and paste in your free API key^(s^).
-echo  2. Verify voice talkback:   python -m jarvis.voice "test"
-echo  3. Run JARVIS:              run.bat        ^(or: python -m jarvis^)
+echo JARVIS is installed with all free extras. To start it later, just run run.bat.
+echo.
+set "LAUNCH="
+set /p "LAUNCH=Start JARVIS now? [Y/n] "
+if /I "%LAUNCH%"=="n" goto :done
+echo Starting JARVIS...
+call run.bat
+goto :eof
+
+:done
+echo You can start JARVIS any time with run.bat ^(or: python -m jarvis^).
 echo.
 pause
 exit /b 0

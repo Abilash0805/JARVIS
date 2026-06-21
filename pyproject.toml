@@ -18,12 +18,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-pc = ["pyautogui>=0.9.54", "pygetwindow>=0.0.9", "psutil>=5.9", "pyperclip>=1.8"]
+pc = ["pyautogui>=0.9.54", "pygetwindow>=0.0.9", "psutil>=5.9", "pyperclip>=1.8", "opencv-python>=4.8"]
 web = ["playwright>=1.42"]
 voice = ["pyttsx3>=2.90", "SpeechRecognition>=3.10"]
 documents = ["python-pptx>=0.6.21", "reportlab>=4.0"]
 all = [
     "pyautogui>=0.9.54", "pygetwindow>=0.0.9", "psutil>=5.9", "pyperclip>=1.8",
+    "opencv-python>=4.8",
     "playwright>=1.42", "pyttsx3>=2.90", "SpeechRecognition>=3.10",
     "python-pptx>=0.6.21", "reportlab>=4.0",
 ]
