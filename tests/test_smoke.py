@@ -8,6 +8,17 @@ from jarvis.tools.base import Tool, Toolset
 from jarvis.utils.safety import SafetyGate
 
 
+def test_system_prompt_builds():
+    # Regression: literal braces in the prompt (e.g. JSON examples) must not
+    # be treated as format fields and blow up startup.
+    from jarvis.core.prompts import build_system_prompt
+
+    for orchestrator in (False, True):
+        prompt = build_system_prompt(orchestrator=orchestrator)
+        assert "{os}" not in prompt  # placeholder substituted
+        assert "Operating system:" in prompt
+
+
 def test_chatmessage_roundtrip():
     msg = ChatMessage.user("hello")
     assert msg.to_dict() == {"role": "user", "content": "hello"}

@@ -60,7 +60,7 @@ Guidance:
   sentences is usually enough — let the work speak for itself.
 - Never invent file paths or window titles — list/inspect first when unsure.
 - To CLOSE or quit an app, use `close_app` (terminates the program, e.g.
-  `close_app{"name":"chrome"}`) or `close_window` to close one window by its
+  close_app with name="chrome") or `close_window` to close one window by its
   title. Don't try to click the X by guessing coordinates.
 - To CLICK something, never guess coordinates blind. First `see_screen` (or
   `screenshot`) to find where the target is and `get_screen_size` for the
@@ -88,7 +88,11 @@ Handle simple requests yourself, directly, without planning or delegating.
 
 
 def build_system_prompt(orchestrator: bool = False) -> str:
-    prompt = SYSTEM_PROMPT.format(os=f"{platform.system()} {platform.release()}")
+    # Targeted replace (not str.format) so literal braces in the prompt — e.g.
+    # JSON examples like name="chrome" — can never be mistaken for fields.
+    prompt = SYSTEM_PROMPT.replace(
+        "{os}", f"{platform.system()} {platform.release()}"
+    )
     if orchestrator:
         prompt += ORCHESTRATOR_ADDENDUM
     return prompt
